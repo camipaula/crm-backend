@@ -11,7 +11,7 @@ const obtenerVentas = async (req, res) => {
         {
           model: Prospecto,
           as: "prospecto",
-          attributes: ["id_prospecto", "nombre", "correo", "telefono"], // ✅ Aquí agregamos el id_prospecto
+          attributes: ["id_prospecto", "nombre", "correo", "telefono"], 
         },
         {
           model: SeguimientoVenta,

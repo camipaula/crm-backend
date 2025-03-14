@@ -7,12 +7,15 @@ const {
   crearProspecto,
   actualizarProspecto,
   eliminarProspecto,
-  obtenerSectores
+  obtenerSectores,
+  exportarProspectos
 } = require("../controllers/prospecto.controller");
 
 const verificarToken = require("../middlewares/authMiddleware");
 
 const router = express.Router();
+//Exportar a excel
+router.get("/exportar", verificarToken, exportarProspectos);
 
 // Obtener todos los sectores únicos de los prospectos
 router.get("/sectores", verificarToken, obtenerSectores);
@@ -37,5 +40,7 @@ router.put("/:id_prospecto", verificarToken, actualizarProspecto);
 
 // Eliminar un prospecto por ID
 router.delete("/:id_prospecto", verificarToken, eliminarProspecto);
+
+
 
 module.exports = router;

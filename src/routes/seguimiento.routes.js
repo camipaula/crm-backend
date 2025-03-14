@@ -8,12 +8,16 @@ const {
   registrarResultadoSeguimiento,  
   eliminarSeguimiento,
   obtenerHistorialPorVenta,
-  obtenerTiposSeguimiento
+  obtenerTiposSeguimiento,
+  exportarSeguimientos
 } = require("../controllers/seguimientoVenta.controller");  
 
 const verificarToken = require("../middlewares/authMiddleware");
 
 const router = express.Router();
+
+//exportar a excel 
+router.get("/exportar", exportarSeguimientos); // Nueva ruta para exportación
 
 // Obtener tipos de seguimiento
 router.get("/tipos-seguimiento", obtenerTiposSeguimiento);
