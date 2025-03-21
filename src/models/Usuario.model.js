@@ -24,6 +24,11 @@ const Usuario = sequelize.define("Usuario", {
         type: DataTypes.ENUM("vendedora", "admin"),
         allowNull: false,
     },
+    estado : {
+        type: DataTypes.TINYINT,
+        allowNull: false,
+        defaultValue: 1, // 1 = activo, 0 = inactivo
+    },
     created_at: {  
         type: DataTypes.DATE,
         allowNull: false,

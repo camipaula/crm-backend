@@ -3,6 +3,7 @@ const ExcelJS = require("exceljs");
 const Prospecto = require("../models/Prospecto.model");
 const Usuario = require("../models/Usuario.model");
 const OrigenProspecto = require("../models/OrigenProspecto.model");
+const CategoriaProspecto = require("../models/CategoriaProspecto.model");
 const VentaProspecto = require("../models/VentaProspecto.model");
 const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 
@@ -10,7 +11,7 @@ const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const obtenerProspectos = async (req, res) => {
   try {
     const { cedula_ruc, rol } = req.usuario; // Cedula del usuario logueado
-    const { cedula_vendedora, estado, fechaInicio, fechaFin, sector } = req.query;
+    const { cedula_vendedora, estado, fechaInicio, fechaFin, sector, id_categoria } = req.query;
 
     const whereClause = {};
 
@@ -24,6 +25,7 @@ const obtenerProspectos = async (req, res) => {
 
     if (estado) whereClause.estado = Array.isArray(estado) ? { [Op.in]: estado } : estado;
     if (sector) whereClause.sector = sector;
+    if (id_categoria) whereClause.id_categoria = id_categoria;
     if (fechaInicio && fechaFin) {
       whereClause.created_at = {
         [Op.between]: [new Date(fechaInicio), new Date(`${fechaFin}T23:59:59`)],
@@ -35,6 +37,7 @@ const obtenerProspectos = async (req, res) => {
       include: [
         { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
         { model: OrigenProspecto, as: "origen_prospecto", attributes: ["descripcion"] },
+        { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, 
         { 
           model: VentaProspecto, 
           as: "ventas",
@@ -62,6 +65,7 @@ const obtenerProspectoPorId = async (req, res) => {
       include: [
         { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
         { model: OrigenProspecto, as: "origen_prospecto", attributes: ["descripcion"] },
+        { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, // ✅ Nueva relación
         { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }
       ],
     });
@@ -84,7 +88,9 @@ const obtenerProspectosPorVendedora = async (req, res) => {
 
     const prospectos = await Prospecto.findAll({
       where: { cedula_vendedora },
-      include: [{ model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }],
+      include: [
+        { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, 
+        { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }],
     });
 
     res.json(prospectos);
@@ -101,7 +107,9 @@ const obtenerProspectosPorEstado = async (req, res) => {
 
     const prospectos = await Prospecto.findAll({
       where: { estado },
-      include: [{ model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }],
+      include: [
+        { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] },
+        { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }],
     });
 
     res.json(prospectos);
@@ -118,7 +126,8 @@ const crearProspecto = async (req, res) => {
 
     const {
       cedula_ruc, nombre, correo, telefono, direccion, provincia,
-      ciudad, sector, id_origen, nota, estado, cedula_vendedora
+      ciudad, sector, id_origen, id_categoria, descripcion, nota, estado, 
+      cedula_vendedora, created_at // 🔹 Se agrega created_at al request
     } = req.body;
 
     let asignarVendedora = cedula_vendedora;
@@ -128,6 +137,9 @@ const crearProspecto = async (req, res) => {
     } else if (!asignarVendedora) {
       return res.status(400).json({ message: "Debe asignar una vendedora al prospecto." });
     }
+
+    // 🔹 Si no se proporciona `created_at`, se usa la fecha actual
+    const fechaCreacion = created_at ? new Date(created_at) : new Date();
 
     const nuevoProspecto = await Prospecto.create({
       cedula_ruc,
@@ -139,35 +151,71 @@ const crearProspecto = async (req, res) => {
       ciudad,
       sector,
       id_origen,
+      id_categoria,
+      descripcion,
       nota,
       estado,
+      archivo: req.file ? req.file.path : null, 
       cedula_vendedora: asignarVendedora,
+      created_at: fechaCreacion, // ✅ Se asigna la fecha de creación personalizada o la actual
     });
 
     res.status(201).json({ message: "Prospecto creado exitosamente", prospecto: nuevoProspecto });
   } catch (error) {
-    console.error(" Error en crearProspecto:", error);
+    console.error("Error en crearProspecto:", error);
     res.status(500).json({ message: "Error al crear prospecto", error });
   }
 };
+
 
 // Actualizar un prospecto
 const actualizarProspecto = async (req, res) => {
   try {
     const { id_prospecto } = req.params;
+    const {
+      nombre, correo, telefono, direccion, provincia, ciudad, sector,
+      id_origen, id_categoria, descripcion, estado, nota, cedula_vendedora
+    } = req.body;
 
-    const [updated] = await Prospecto.update(req.body, { where: { id_prospecto } });
-
-    if (!updated) {
-      return res.status(404).json({ message: "Prospecto no encontrado o sin cambios." });
+    const prospecto = await Prospecto.findByPk(id_prospecto);
+    if (!prospecto) {
+      return res.status(404).json({ message: "Prospecto no encontrado" });
     }
 
-    res.json({ message: "Prospecto actualizado correctamente." });
+    // ✅ Si el campo `cedula_vendedora` es "", lo convertimos a `null`
+    const vendedoraAsignada = cedula_vendedora === "" ? null : cedula_vendedora;
+
+    // ✅ Solo actualiza si el campo está presente en la solicitud
+    prospecto.nombre = nombre ?? prospecto.nombre;
+    prospecto.correo = correo ?? prospecto.correo;
+    prospecto.telefono = telefono ?? prospecto.telefono;
+    prospecto.direccion = direccion ?? prospecto.direccion;
+    prospecto.provincia = provincia ?? prospecto.provincia;
+    prospecto.ciudad = ciudad ?? prospecto.ciudad;
+    prospecto.sector = sector ?? prospecto.sector;
+    prospecto.id_origen = id_origen ?? prospecto.id_origen;
+    prospecto.id_categoria = id_categoria ?? prospecto.id_categoria;
+    prospecto.descripcion = descripcion ?? prospecto.descripcion;
+    prospecto.estado = estado ?? prospecto.estado;
+    prospecto.nota = nota ?? prospecto.nota;
+    prospecto.cedula_vendedora = vendedoraAsignada;
+
+    // Manejo del archivo (si se sube uno nuevo)
+    if (req.file) {
+      prospecto.archivo = req.file.path;
+    }
+
+    await prospecto.save();
+
+    res.json({ message: "Prospecto actualizado correctamente", prospecto });
   } catch (error) {
-    console.error(" Error al actualizar prospecto:", error);
+    console.error("Error al actualizar prospecto:", error);
     res.status(500).json({ message: "Error al actualizar prospecto", error });
   }
 };
+
+
+
 
 // Eliminar un prospecto
 const eliminarProspecto = async (req, res) => {
@@ -204,6 +252,25 @@ const obtenerSectores = async (req, res) => {
   }
 };
 
+const obtenerProspectosPorCategoria = async (req, res) => {
+  try {
+    const { id_categoria } = req.params;
+
+    const prospectos = await Prospecto.findAll({
+      where: { id_categoria },
+      include: [
+        { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
+        { model: OrigenProspecto, as: "origen_prospecto", attributes: ["descripcion"] },
+        { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, 
+        { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }
+      ],
+    });
+
+    res.json(prospectos);
+  } catch (error) {
+    res.status(500).json({ message: "Error al obtener prospectos por categoría", error });
+  }
+};
 
 
 // Exportar prospectos a Excel
@@ -308,5 +375,6 @@ module.exports = {
   actualizarProspecto,
   eliminarProspecto,
   obtenerSectores,
+  obtenerProspectosPorCategoria,
   exportarProspectos
 };

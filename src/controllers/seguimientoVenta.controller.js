@@ -135,7 +135,7 @@ const crearSeguimiento = async (req, res) => {
 const registrarResultadoSeguimiento = async (req, res) => {
   try {
     const { id_seguimiento } = req.params;
-    const { resultado, nota, estado } = req.body; // Ahora recibimos el estado del prospecto
+    const { resultado, nota, estado } = req.body; // Recibimos el nuevo estado del prospecto
 
     // Buscar el seguimiento con la venta y el prospecto
     const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento, {
@@ -159,19 +159,19 @@ const registrarResultadoSeguimiento = async (req, res) => {
     const venta = seguimiento.venta;
     const prospecto = venta.prospecto;
 
-    // Si el estado del prospecto es "ganado", "perdido" o "archivado", cerrar la venta
-    if (["ganado", "perdido", "archivado"].includes(estado)) {
-      venta.abierta = 0; // Marcar la venta como cerrada
+    // 🔹 Si el estado del prospecto es "ganado" o "perdido", cerrar la venta
+    if (["ganado", "perdido"].includes(estado)) {
+      venta.abierta = 0; // Cerrar la venta
       venta.fecha_cierre = new Date();
       await venta.save();
     }
 
-    // Verificar si el prospecto tiene otra venta abierta
+    // 🔹 Verificar si el prospecto tiene otra venta abierta
     const tieneOtraVentaAbierta = await VentaProspecto.findOne({
       where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
     });
 
-    // Si aún tiene una venta abierta, volver a "interesado", sino mantener el nuevo estado
+    // 🔹 Si aún tiene una venta abierta, dejarlo en "interesado", sino actualizar con el nuevo estado
     prospecto.estado = tieneOtraVentaAbierta ? "interesado" : estado;
     await prospecto.save();
 
@@ -325,6 +325,44 @@ const exportarSeguimientos = async (req, res) => {
   }
 };
 
+const obtenerAgendaGeneral = async (req, res) => {
+  try {
+    const { cedula_vendedora } = req.query; // 🔹 Si hay filtro por vendedora
+
+    let whereCondition = {};
+    if (cedula_vendedora) {
+      whereCondition.cedula_vendedora = cedula_vendedora;
+    }
+
+    const agenda = await SeguimientoVenta.findAll({
+      where: { estado: "pendiente", ...whereCondition }, // 🔹 Solo seguimientos pendientes
+      include: [
+        {
+          model: VentaProspecto,
+          as: "venta",
+          attributes: ["objetivo"],
+          include: [
+            {
+              model: Prospecto,
+              as: "prospecto",
+              attributes: ["nombre"],
+            },
+          ],
+        },
+        { model: Usuario, as: "vendedora_seguimiento", attributes: ["nombre", "cedula_ruc"] },
+        { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] },
+      ],
+      order: [["fecha_programada", "ASC"]],
+    });
+
+    res.json(agenda);
+  } catch (error) {
+    console.error("Error al obtener agenda general:", error);
+    res.status(500).json({ message: "Error al obtener agenda", error });
+  }
+};
+
+
 module.exports = {
   obtenerSeguimientos,
   obtenerSeguimientoPorId,
@@ -335,5 +373,6 @@ module.exports = {
   eliminarSeguimiento,
   obtenerHistorialPorVenta,
   obtenerTiposSeguimiento,
-  exportarSeguimientos
+  exportarSeguimientos,
+  obtenerAgendaGeneral
 };

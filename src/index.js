@@ -9,6 +9,8 @@ const prospectoRoutes = require("./routes/prospecto.routes");
 const usuarioRoutes = require("./routes/usuario.routes");
 const ventaRoutes = require("./routes/venta.routes"); 
 const seguimientoRoutes = require("./routes/seguimiento.routes"); 
+const categoriasRoutes = require("./routes/categorias");
+const dashboardRoutes = require("./routes/dashboard.routes");
 
 // Cargar variables de entorno
 dotenv.config();
@@ -26,6 +28,10 @@ app.use("/api/prospectos", prospectoRoutes);
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api/ventas", ventaRoutes); 
 app.use("/api/seguimientos", seguimientoRoutes); 
+app.use("/api/categorias", categoriasRoutes);
+// Agregar la ruta del dashboard
+app.use("/api/dashboard", dashboardRoutes);
+
 
 // Importar asociaciones entre modelos antes de sincronizar
 require("./models/associations");

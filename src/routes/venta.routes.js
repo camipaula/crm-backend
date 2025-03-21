@@ -5,7 +5,8 @@ const {
   obtenerVentaPorId,
   crearVenta,
   cerrarVenta,
-  eliminarVenta
+  eliminarVenta,
+  obtenerProspeccionesAgrupadas
 } = require("../controllers/ventaProspecto.controller")
 
 const verificarToken = require("../middlewares/authMiddleware");
@@ -15,6 +16,9 @@ const router = express.Router();
 
 // Obtener todas las ventas de un prospecto específico
 router.get("/prospecto/:id_prospecto", verificarToken, obtenerVentasPorProspecto);
+
+//obtener ventas agrupadas
+router.get("/prospecciones", obtenerProspeccionesAgrupadas);
 
 // Obtener todas las ventas
 router.get("/", verificarToken, obtenerVentas);

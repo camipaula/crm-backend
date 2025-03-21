@@ -34,6 +34,8 @@ const obtenerVentas = async (req, res) => {
   }
 };
 
+
+
 // Obtener todas las ventas de un prospecto específico
 const obtenerVentasPorProspecto = async (req, res) => {
   try {
@@ -75,8 +77,16 @@ const obtenerVentaPorId = async (req, res) => {
 
     const venta = await VentaProspecto.findByPk(id_venta, {
       include: [
-        { model: Prospecto, as: "prospecto", attributes: ["nombre", "correo", "telefono"] },
-        { model: SeguimientoVenta, as: "seguimientos" },
+        { 
+          model: Prospecto, 
+          as: "prospecto", 
+          attributes: ["nombre", "correo", "telefono", "cedula_vendedora"] // 👈 Agregar cedula_vendedora
+        },
+        { 
+          model: SeguimientoVenta, 
+          as: "seguimientos",
+          include: [{ model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] }]
+        },
       ],
     });
 
@@ -86,10 +96,12 @@ const obtenerVentaPorId = async (req, res) => {
 
     res.json(venta);
   } catch (error) {
-    console.error(" Error al obtener venta:", error);
+    console.error("Error al obtener venta:", error);
     res.status(500).json({ message: "Error al obtener venta", error });
   }
 };
+
+
 
 // Crear una nueva venta para un prospecto
 const crearVenta = async (req, res) => {
@@ -144,6 +156,45 @@ const eliminarVenta = async (req, res) => {
   }
 };
 
+
+const obtenerProspeccionesAgrupadas = async (req, res) => {
+  try {
+    const { cedula_vendedora, estado_prospeccion } = req.query;
+
+    // Construimos la condición de filtrado
+    let whereVenta = {};
+    if (estado_prospeccion === "abiertas") whereVenta.abierta = 1;
+    if (estado_prospeccion === "cerradas") whereVenta.abierta = 0;
+
+    const ventas = await VentaProspecto.findAll({
+      where: whereVenta,
+      include: [
+        {
+          model: Prospecto,
+          as: "prospecto",
+          attributes: ["id_prospecto", "nombre", "estado"], // 🔹 Agregamos el estado del prospecto
+          where: cedula_vendedora ? { cedula_vendedora } : undefined, // Filtrar por vendedora si se envía
+        },
+        {
+          model: SeguimientoVenta,
+          as: "seguimientos",
+          include: [
+            { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] },
+          ],
+          order: [["fecha_programada", "DESC"]], // Ordenar para obtener el último
+          limit: 1, // Solo el último seguimiento
+        },
+      ],
+    });
+
+    res.json(ventas);
+  } catch (error) {
+    console.error(" Error al obtener prospecciones agrupadas:", error);
+    res.status(500).json({ message: "Error al obtener prospecciones", error });
+  }
+};
+
+
 module.exports = {
   obtenerVentas,
   obtenerVentasPorProspecto,
@@ -151,4 +202,5 @@ module.exports = {
   crearVenta,
   cerrarVenta,
   eliminarVenta,
+  obtenerProspeccionesAgrupadas
 };

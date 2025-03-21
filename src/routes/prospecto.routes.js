@@ -1,4 +1,6 @@
 const express = require("express");
+const upload = require("../middlewares/upload");
+
 const {
   obtenerProspectos,
   obtenerProspectoPorId,
@@ -8,6 +10,7 @@ const {
   actualizarProspecto,
   eliminarProspecto,
   obtenerSectores,
+  obtenerProspectosPorCategoria,
   exportarProspectos
 } = require("../controllers/prospecto.controller");
 
@@ -20,8 +23,12 @@ router.get("/exportar", verificarToken, exportarProspectos);
 // Obtener todos los sectores únicos de los prospectos
 router.get("/sectores", verificarToken, obtenerSectores);
 
+
 // Obtener todos los prospectos con filtros opcionales
 router.get("/", verificarToken, obtenerProspectos);
+
+//obtener propsectos por categoria
+router.get("/categoria/:id_categoria", obtenerProspectosPorCategoria);
 
 // Obtener prospectos de una vendedora
 router.get("/vendedora/:cedula_vendedora", verificarToken, obtenerProspectosPorVendedora);
@@ -33,10 +40,10 @@ router.get("/estado/:estado", verificarToken, obtenerProspectosPorEstado);
 router.get("/:id_prospecto", verificarToken, obtenerProspectoPorId);
 
 // Crear un nuevo prospecto
-router.post("/", verificarToken, crearProspecto);
+router.post("/", verificarToken, upload.single("archivo"), crearProspecto);
 
 // Actualizar un prospecto por ID
-router.put("/:id_prospecto", verificarToken, actualizarProspecto);
+router.put("/:id_prospecto", upload.single("archivo"), actualizarProspecto);
 
 // Eliminar un prospecto por ID
 router.delete("/:id_prospecto", verificarToken, eliminarProspecto);
