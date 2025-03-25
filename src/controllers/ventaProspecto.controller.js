@@ -11,7 +11,7 @@ const obtenerVentas = async (req, res) => {
         {
           model: Prospecto,
           as: "prospecto",
-          attributes: ["id_prospecto", "nombre", "correo", "telefono"], 
+          attributes: ["id_prospecto", "nombre","nombre_contacto", "correo", "telefono"], 
         },
         {
           model: SeguimientoVenta,
@@ -80,7 +80,7 @@ const obtenerVentaPorId = async (req, res) => {
         { 
           model: Prospecto, 
           as: "prospecto", 
-          attributes: ["nombre", "correo", "telefono", "cedula_vendedora"] // 👈 Agregar cedula_vendedora
+          attributes: ["nombre","nombre_contacto", "correo", "telefono", "cedula_vendedora"] 
         },
         { 
           model: SeguimientoVenta, 

@@ -77,7 +77,7 @@ const obtenerSeguimientosPorVendedora = async (req, res) => {
 const obtenerAgendaPorVendedora = async (req, res) => {
   try {
     const { cedula_vendedora } = req.params;
-    
+
     const agenda = await SeguimientoVenta.findAll({
       where: {
         cedula_vendedora,
@@ -92,7 +92,7 @@ const obtenerAgendaPorVendedora = async (req, res) => {
             {
               model: Prospecto,
               as: "prospecto",
-              attributes: ["nombre"], 
+              attributes: ["nombre"],
             },
           ],
         },
@@ -161,19 +161,24 @@ const registrarResultadoSeguimiento = async (req, res) => {
 
     // 🔹 Si el estado del prospecto es "ganado" o "perdido", cerrar la venta
     if (["ganado", "perdido"].includes(estado)) {
-      venta.abierta = 0; // Cerrar la venta
+      venta.abierta = 0;
       venta.fecha_cierre = new Date();
       await venta.save();
+
+      // 🔹 Verificar si el prospecto tiene otra venta abierta
+      const tieneOtraVentaAbierta = await VentaProspecto.findOne({
+        where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
+      });
+
+      // Si hay otra venta abierta, lo dejamos como interesado, si no, lo ponemos como ganado o perdido
+      prospecto.estado = tieneOtraVentaAbierta ? "interesado" : estado;
+    } else {
+      // Si no es cierre de venta, simplemente actualizamos con el estado enviado
+      prospecto.estado = estado;
     }
 
-    // 🔹 Verificar si el prospecto tiene otra venta abierta
-    const tieneOtraVentaAbierta = await VentaProspecto.findOne({
-      where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
-    });
-
-    // 🔹 Si aún tiene una venta abierta, dejarlo en "interesado", sino actualizar con el nuevo estado
-    prospecto.estado = tieneOtraVentaAbierta ? "interesado" : estado;
     await prospecto.save();
+
 
     res.json({ message: "Seguimiento actualizado correctamente", seguimiento, venta, prospecto });
   } catch (error) {
@@ -362,17 +367,48 @@ const obtenerAgendaGeneral = async (req, res) => {
   }
 };
 
+// Editar un seguimiento pendiente
+const editarSeguimiento = async (req, res) => {
+  try {
+    const { id_seguimiento } = req.params;
+    const { fecha_programada, id_tipo, motivo } = req.body;
+
+    const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento);
+
+    if (!seguimiento) {
+      return res.status(404).json({ message: "Seguimiento no encontrado" });
+    }
+
+    if (seguimiento.estado !== "pendiente") {
+      return res.status(400).json({ message: "Solo se pueden editar seguimientos pendientes" });
+    }
+
+    seguimiento.fecha_programada = fecha_programada || seguimiento.fecha_programada;
+    seguimiento.id_tipo = id_tipo || seguimiento.id_tipo;
+    seguimiento.motivo = motivo || seguimiento.motivo;
+
+    await seguimiento.save();
+
+    res.json({ message: "Seguimiento actualizado correctamente", seguimiento });
+  } catch (error) {
+    console.error("Error al editar seguimiento:", error);
+    res.status(500).json({ message: "Error al editar seguimiento", error });
+  }
+};
+
+
 
 module.exports = {
   obtenerSeguimientos,
   obtenerSeguimientoPorId,
   obtenerSeguimientosPorVendedora,
-  obtenerAgendaPorVendedora, 
+  obtenerAgendaPorVendedora,
   crearSeguimiento,
-  registrarResultadoSeguimiento, 
+  registrarResultadoSeguimiento,
   eliminarSeguimiento,
   obtenerHistorialPorVenta,
   obtenerTiposSeguimiento,
   exportarSeguimientos,
-  obtenerAgendaGeneral
+  obtenerAgendaGeneral,
+  editarSeguimiento
 };

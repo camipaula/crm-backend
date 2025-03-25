@@ -125,7 +125,7 @@ const crearProspecto = async (req, res) => {
     console.log("Usuario autenticado en crearProspecto:", req.usuario);
 
     const {
-      cedula_ruc, nombre, correo, telefono, direccion, provincia,
+      cedula_ruc, nombre,nombre_contacto, correo, telefono, direccion, provincia,
       ciudad, sector, id_origen, id_categoria, descripcion, nota, estado, 
       cedula_vendedora, created_at // 🔹 Se agrega created_at al request
     } = req.body;
@@ -138,12 +138,13 @@ const crearProspecto = async (req, res) => {
       return res.status(400).json({ message: "Debe asignar una vendedora al prospecto." });
     }
 
-    // 🔹 Si no se proporciona `created_at`, se usa la fecha actual
+    // Si no se proporciona `created_at`, se usa la fecha actual
     const fechaCreacion = created_at ? new Date(created_at) : new Date();
 
     const nuevoProspecto = await Prospecto.create({
       cedula_ruc,
       nombre,
+      nombre_contacto,
       correo,
       telefono,
       direccion,
@@ -157,7 +158,7 @@ const crearProspecto = async (req, res) => {
       estado,
       archivo: req.file ? req.file.path : null, 
       cedula_vendedora: asignarVendedora,
-      created_at: fechaCreacion, // ✅ Se asigna la fecha de creación personalizada o la actual
+      created_at: fechaCreacion, // Se asigna la fecha de creación personalizada o la actual
     });
 
     res.status(201).json({ message: "Prospecto creado exitosamente", prospecto: nuevoProspecto });
@@ -173,7 +174,7 @@ const actualizarProspecto = async (req, res) => {
   try {
     const { id_prospecto } = req.params;
     const {
-      nombre, correo, telefono, direccion, provincia, ciudad, sector,
+      nombre,nombre_contacto, correo, telefono, direccion, provincia, ciudad, sector,
       id_origen, id_categoria, descripcion, estado, nota, cedula_vendedora
     } = req.body;
 
@@ -182,11 +183,12 @@ const actualizarProspecto = async (req, res) => {
       return res.status(404).json({ message: "Prospecto no encontrado" });
     }
 
-    // ✅ Si el campo `cedula_vendedora` es "", lo convertimos a `null`
+    // Si el campo `cedula_vendedora` es "", lo convertimos a `null`
     const vendedoraAsignada = cedula_vendedora === "" ? null : cedula_vendedora;
 
-    // ✅ Solo actualiza si el campo está presente en la solicitud
+    // Solo actualiza si el campo está presente en la solicitud
     prospecto.nombre = nombre ?? prospecto.nombre;
+    prospecto.nombre_contacto = nombre_contacto ?? prospecto.nombre_contacto;
     prospecto.correo = correo ?? prospecto.correo;
     prospecto.telefono = telefono ?? prospecto.telefono;
     prospecto.direccion = direccion ?? prospecto.direccion;
@@ -319,6 +321,7 @@ const exportarProspectos = async (req, res) => {
     sheet.columns = [
       { header: "ID", key: "id_prospecto", width: 10 },
       { header: "Nombre", key: "nombre", width: 20 },
+      { header: "Nombre Contacto", key: "nombre_contacto", width: 20 }, 
       { header: "Correo", key: "correo", width: 25 },
       { header: "Teléfono", key: "telefono", width: 15 },
       { header: "Dirección", key: "direccion", width: 30 },
@@ -341,6 +344,7 @@ const exportarProspectos = async (req, res) => {
       sheet.addRow({
         id_prospecto: p.id_prospecto,
         nombre: p.nombre,
+        nombre_contacto: p.nombre_contacto || "No registrado", 
         correo: p.correo || "No registrado",
         telefono: p.telefono,
         direccion: p.direccion || "No registrada",

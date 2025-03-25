@@ -18,6 +18,10 @@
             type: DataTypes.STRING(100),
             allowNull: false,
         },
+        nombre_contacto: {
+            type: DataTypes.STRING(100),
+            allowNull: true,
+          },          
         correo: {
             type: DataTypes.STRING(100),
             allowNull: true,

@@ -10,7 +10,8 @@ const {
   obtenerHistorialPorVenta,
   obtenerTiposSeguimiento,
   exportarSeguimientos,
-  obtenerAgendaGeneral
+  obtenerAgendaGeneral,
+  editarSeguimiento
 } = require("../controllers/seguimientoVenta.controller");  
 
 const verificarToken = require("../middlewares/authMiddleware");
@@ -41,6 +42,9 @@ router.get("/", verificarToken, obtenerSeguimientos);
 
 // Crear un nuevo seguimiento
 router.post("/", verificarToken, crearSeguimiento);
+
+//editar un seguimiento 
+router.put("/:id_seguimiento/editar", verificarToken, editarSeguimiento);
 
 // Obtener un seguimiento por su ID
 router.get("/:id_seguimiento", verificarToken, obtenerSeguimientoPorId);
