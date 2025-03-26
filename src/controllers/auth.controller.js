@@ -4,16 +4,26 @@ const Usuario = require("../models/Usuario.model");
 
 const signup = async (req, res) => { 
   try {
-    const {cedula_ruc, nombre, email, password, rol } = req.body; //cédula como id
+    const { cedula_ruc, nombre, email, password, rol } = req.body;
 
-    // Verifica si el usuario ya existe
+    // ✅ Validar campos obligatorios
+    if (!cedula_ruc || !nombre || !email || !password || !rol) {
+      return res.status(400).json({ message: "Todos los campos son obligatorios" });
+    }
+
+    // Opcional: validar longitud mínima de la contraseña
+    if (password.length < 6) {
+      return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+    }
+
+    // Verifica si el usuario ya existe por email
     const usuarioExistente = await Usuario.findOne({ where: { email } });
     if (usuarioExistente) {
       return res.status(400).json({ message: "El usuario ya está registrado" });
     }
 
-    // Verifica si la cédula ya existe
-    const cedulaExistente = await Usuario.findOne({ where: { cedula_ruc  } });
+    // Verifica si la cédula ya está registrada
+    const cedulaExistente = await Usuario.findOne({ where: { cedula_ruc } });
     if (cedulaExistente) {
       return res.status(400).json({ message: "La cédula ya está registrada" });
     }
@@ -21,17 +31,19 @@ const signup = async (req, res) => {
     // Hashea la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crea el nuevo usuario con la cédula como ID
+    // Crea el nuevo usuario
     const nuevoUsuario = await Usuario.create({
-      cedula_ruc,  // Ahora es la cédula
+      cedula_ruc,
       nombre,
       email,
       password: hashedPassword,
       rol,
+      estado: 1, // opcional, para activar usuario por defecto
     });
 
     res.status(201).json({ message: "Usuario creado exitosamente", usuario: nuevoUsuario });
   } catch (error) {
+    console.error("Error en signup:", error);
     res.status(500).json({ message: "Error al registrar usuario", error });
   }
 };
