@@ -6,6 +6,7 @@ const {
   crearVenta,
   cerrarVenta,
   eliminarVenta,
+  editarObjetivoVenta,
   obtenerProspeccionesAgrupadas
 } = require("../controllers/ventaProspecto.controller")
 
@@ -34,5 +35,7 @@ router.put("/:id_venta/cerrar", verificarToken, cerrarVenta);
 
 // Eliminar una venta
 router.delete("/:id_venta", verificarToken, eliminarVenta);
+
+router.put("/:id_venta/objetivo", verificarToken, editarObjetivoVenta);
 
 module.exports = router;

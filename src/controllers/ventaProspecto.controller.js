@@ -140,6 +140,26 @@ const cerrarVenta = async (req, res) => {
   }
 };
 
+// Editar el objetivo de una venta
+const editarObjetivoVenta = async (req, res) => {
+  try {
+    const { id_venta } = req.params;
+    const { objetivo } = req.body;
+
+    const venta = await VentaProspecto.findByPk(id_venta);
+    if (!venta) return res.status(404).json({ message: "Venta no encontrada" });
+
+    venta.objetivo = objetivo;
+    await venta.save();
+
+    res.json({ message: "Objetivo actualizado correctamente", venta });
+  } catch (error) {
+    console.error("Error al editar objetivo:", error);
+    res.status(500).json({ message: "Error al editar objetivo", error });
+  }
+};
+
+
 // Eliminar una venta
 const eliminarVenta = async (req, res) => {
   try {
@@ -202,5 +222,6 @@ module.exports = {
   crearVenta,
   cerrarVenta,
   eliminarVenta,
+  editarObjetivoVenta,
   obtenerProspeccionesAgrupadas
 };

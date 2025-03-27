@@ -6,6 +6,16 @@ const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 const { Op } = require("sequelize");
 const ExcelJS = require("exceljs");
 
+function parseLocalDatetime(datetimeStr) {
+  // datetimeStr: "2025-03-27T10:00"
+  const [datePart, timePart] = datetimeStr.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+
+  return new Date(year, month - 1, day, hour, minute); // Date en hora local
+}
+
+
 // Obtener todos los seguimientos
 const obtenerSeguimientos = async (req, res) => {
   try {
@@ -114,15 +124,18 @@ const crearSeguimiento = async (req, res) => {
   try {
     const { id_venta, cedula_vendedora, fecha_programada, id_tipo, motivo, nota } = req.body;
 
-    const nuevoSeguimiento = await SeguimientoVenta.create({
-      id_venta,
-      cedula_vendedora,
-      fecha_programada,
-      id_tipo,
-      motivo,
-      nota,
-      estado: "pendiente",
-    });
+    const fechaUTC = parseLocalDatetime(fecha_programada);
+
+const nuevoSeguimiento = await SeguimientoVenta.create({
+  id_venta,
+  cedula_vendedora,
+  fecha_programada: fechaUTC, // Esto ya será en hora local
+  id_tipo,
+  motivo,
+  nota,
+  estado: "pendiente",
+});
+
 
     res.status(201).json({ message: "Seguimiento creado exitosamente", seguimiento: nuevoSeguimiento });
   } catch (error) {
@@ -382,6 +395,11 @@ const editarSeguimiento = async (req, res) => {
     if (seguimiento.estado !== "pendiente") {
       return res.status(400).json({ message: "Solo se pueden editar seguimientos pendientes" });
     }
+    
+    if (fecha_programada) {
+      seguimiento.fecha_programada = parseLocalDatetime(fecha_programada);
+    }
+    
 
     seguimiento.fecha_programada = fecha_programada || seguimiento.fecha_programada;
     seguimiento.id_tipo = id_tipo || seguimiento.id_tipo;
