@@ -6,7 +6,7 @@ const signup = async (req, res) => {
   try {
     const { cedula_ruc, nombre, email, password, rol } = req.body;
 
-    // ✅ Validar campos obligatorios
+    // Validar campos obligatorios
     if (!cedula_ruc || !nombre || !email || !password || !rol) {
       return res.status(400).json({ message: "Todos los campos son obligatorios" });
     }
@@ -66,7 +66,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { cedula_ruc: usuario.cedula_ruc, email: usuario.email, rol: usuario.rol },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "12h" }
     );    
 
     res.status(200).json({ 
