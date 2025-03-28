@@ -6,6 +6,12 @@ const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 const { Op } = require("sequelize");
 const ExcelJS = require("exceljs");
 
+function parseLocalDatetime(datetimeStr) {
+  const [datePart, timePart] = datetimeStr.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute] = timePart.split(":").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hour, minute)); // ⬅️ UTC real
+}
 
 // Obtener todos los seguimientos
 const obtenerSeguimientos = async (req, res) => {
@@ -114,11 +120,12 @@ const obtenerAgendaPorVendedora = async (req, res) => {
 const crearSeguimiento = async (req, res) => {
   try {
     const { id_venta, cedula_vendedora, fecha_programada, id_tipo, motivo, nota } = req.body;
+    const fechaUTC = parseLocalDatetime(fecha_programada);
 
     const nuevoSeguimiento = await SeguimientoVenta.create({
       id_venta,
       cedula_vendedora,
-      fecha_programada, // ✅ usamos el string tal como llega (ej: "2025-03-27T19:00")
+      fecha_programada: fechaUTC, 
       id_tipo,
       motivo,
       nota,
