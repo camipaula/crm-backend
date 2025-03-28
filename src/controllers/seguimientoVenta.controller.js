@@ -6,15 +6,6 @@ const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 const { Op } = require("sequelize");
 const ExcelJS = require("exceljs");
 
-function parseLocalDatetime(datetimeStr) {
-  // datetimeStr: "2025-03-27T10:00"
-  const [datePart, timePart] = datetimeStr.split("T");
-  const [year, month, day] = datePart.split("-").map(Number);
-  const [hour, minute] = timePart.split(":").map(Number);
-
-  return new Date(year, month - 1, day, hour, minute); // Date en hora local
-}
-
 
 // Obtener todos los seguimientos
 const obtenerSeguimientos = async (req, res) => {
@@ -124,22 +115,22 @@ const crearSeguimiento = async (req, res) => {
   try {
     const { id_venta, cedula_vendedora, fecha_programada, id_tipo, motivo, nota } = req.body;
 
-    const fechaUTC = parseLocalDatetime(fecha_programada);
+    const nuevoSeguimiento = await SeguimientoVenta.create({
+      id_venta,
+      cedula_vendedora,
+      fecha_programada, // ✅ usamos el string tal como llega (ej: "2025-03-27T19:00")
+      id_tipo,
+      motivo,
+      nota,
+      estado: "pendiente",
+    });
 
-const nuevoSeguimiento = await SeguimientoVenta.create({
-  id_venta,
-  cedula_vendedora,
-  fecha_programada: fechaUTC, // Esto ya será en hora local
-  id_tipo,
-  motivo,
-  nota,
-  estado: "pendiente",
-});
-
-
-    res.status(201).json({ message: "Seguimiento creado exitosamente", seguimiento: nuevoSeguimiento });
+    res.status(201).json({
+      message: "Seguimiento creado exitosamente",
+      seguimiento: nuevoSeguimiento,
+    });
   } catch (error) {
-    console.error(" Error al crear seguimiento:", error);
+    console.error("Error al crear seguimiento:", error);
     res.status(500).json({ message: "Error al crear seguimiento", error });
   }
 };
@@ -395,13 +386,11 @@ const editarSeguimiento = async (req, res) => {
     if (seguimiento.estado !== "pendiente") {
       return res.status(400).json({ message: "Solo se pueden editar seguimientos pendientes" });
     }
-    
-    if (fecha_programada) {
-      seguimiento.fecha_programada = parseLocalDatetime(fecha_programada);
-    }
-    
 
-    seguimiento.fecha_programada = fecha_programada || seguimiento.fecha_programada;
+    if (fecha_programada) {
+      seguimiento.fecha_programada = fecha_programada; // ✅ sin parseo
+    }
+
     seguimiento.id_tipo = id_tipo || seguimiento.id_tipo;
     seguimiento.motivo = motivo || seguimiento.motivo;
 
@@ -413,6 +402,7 @@ const editarSeguimiento = async (req, res) => {
     res.status(500).json({ message: "Error al editar seguimiento", error });
   }
 };
+
 
 
 
