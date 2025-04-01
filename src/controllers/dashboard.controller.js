@@ -4,6 +4,7 @@ const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const VentaProspecto = require("../models/VentaProspecto.model");
 const Usuario = require("../models/Usuario.model");
 const CategoriaProspecto = require("../models/CategoriaProspecto.model");
+const EstadoProspecto = require("../models/EstadoProspecto.model");
 
 const obtenerDashboard = async (req, res) => {
   try {
@@ -17,8 +18,16 @@ const obtenerDashboard = async (req, res) => {
     // 1️⃣ Prospectos por Estado
     const prospectosPorEstado = await Prospecto.findAll({
       where: filtroVendedora,
-      attributes: ["estado", [Sequelize.fn("COUNT", Sequelize.col("estado")), "cantidad"]],
-      group: ["estado"],
+      attributes: [
+        [Sequelize.col("estado_prospecto.nombre"), "estado"],
+        [Sequelize.fn("COUNT", Sequelize.col("Prospecto.id_estado")), "cantidad"],
+      ],
+      include: [{
+        model: EstadoProspecto,
+        as: "estado_prospecto",
+        attributes: [], // No lo traemos en el objeto directamente, solo usamos su nombre
+      }],
+      group: ["estado_prospecto.nombre", "Prospecto.id_estado"],
     });
 
     // 2️⃣ Ventas Abiertas vs Cerradas

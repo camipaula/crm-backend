@@ -5,6 +5,7 @@ const CategoriaProspecto = require("./CategoriaProspecto.model");
 const VentaProspecto = require("./VentaProspecto.model");
 const SeguimientoVenta = require("./SeguimientoVenta.model");
 const TipoSeguimiento = require("./TipoSeguimiento.model");
+const EstadoProspecto = require("./EstadoProspecto.model");
 
 // Relación Usuario - Prospecto (1 a muchos)
 Usuario.hasMany(Prospecto, { foreignKey: "cedula_vendedora", as: "prospectos_vendedora", onDelete: "CASCADE" });
@@ -35,11 +36,24 @@ SeguimientoVenta.belongsTo(Usuario, { foreignKey: "cedula_vendedora", as: "vende
 TipoSeguimiento.hasMany(SeguimientoVenta, { foreignKey: "id_tipo", as: "seguimientos_tipo", onDelete: "CASCADE" });
 SeguimientoVenta.belongsTo(TipoSeguimiento, { foreignKey: "id_tipo", as: "tipo_seguimiento" });
 
+// Relación Prospecto - EstadoProspecto (1 a 1)
+EstadoProspecto.hasMany(Prospecto, {
+    foreignKey: "id_estado",
+    as: "prospectos_estado",
+    onDelete: "SET NULL"
+  });
+  Prospecto.belongsTo(EstadoProspecto, {
+    foreignKey: "id_estado",
+    as: "estado_prospecto"
+  });
+  
+  
 module.exports = { 
     Usuario, 
     Prospecto, 
     OrigenProspecto, 
     VentaProspecto, 
     SeguimientoVenta, 
-    TipoSeguimiento 
+    TipoSeguimiento,
+    EstadoProspecto 
 };

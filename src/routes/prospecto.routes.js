@@ -10,8 +10,10 @@ const {
   actualizarProspecto,
   eliminarProspecto,
   obtenerSectores,
+  obtenerOrigenes,
   obtenerProspectosPorCategoria,
-  exportarProspectos
+  exportarProspectos,
+  obtenerEstadosProspecto
 } = require("../controllers/prospecto.controller");
 
 const verificarToken = require("../middlewares/authMiddleware");
@@ -23,6 +25,11 @@ router.get("/exportar", verificarToken, exportarProspectos);
 // Obtener todos los sectores únicos de los prospectos
 router.get("/sectores", verificarToken, obtenerSectores);
 
+//obtener origenes del prospecto
+router.get("/origenes", verificarToken, obtenerOrigenes);
+
+//Obtener estados de prospecto
+router.get("/estados", verificarToken, obtenerEstadosProspecto);
 
 // Obtener todos los prospectos con filtros opcionales
 router.get("/", verificarToken, obtenerProspectos);

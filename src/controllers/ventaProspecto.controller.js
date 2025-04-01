@@ -2,6 +2,7 @@ const VentaProspecto = require("../models/VentaProspecto.model");
 const Prospecto = require("../models/Prospecto.model");
 const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const TipoSeguimiento = require("../models/TipoSeguimiento.model");
+const EstadoProspecto = require("../models/EstadoProspecto.model"); 
 
 // Obtener todas las ventas de prospectos con sus seguimientos
 const obtenerVentas = async (req, res) => {
@@ -11,8 +12,15 @@ const obtenerVentas = async (req, res) => {
         {
           model: Prospecto,
           as: "prospecto",
-          attributes: ["id_prospecto", "nombre","nombre_contacto", "correo", "telefono"], 
-        },
+          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono"],
+          include: [
+            {
+              model: EstadoProspecto,
+              as: "estado_prospecto",
+              attributes: ["nombre"],
+            }
+          ]
+        },        
         {
           model: SeguimientoVenta,
           as: "seguimientos",
@@ -45,17 +53,29 @@ const obtenerVentasPorProspecto = async (req, res) => {
       where: { id_prospecto },
       include: [
         {
+          model: Prospecto,
+          as: "prospecto",
+          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono"],
+          include: [
+            {
+              model: EstadoProspecto,
+              as: "estado_prospecto",
+              attributes: ["nombre"]
+            }
+          ]
+        },
+        {
           model: SeguimientoVenta,
           as: "seguimientos",
           include: [
             {
               model: TipoSeguimiento,
               as: "tipo_seguimiento",
-              attributes: ["descripcion"],
-            },
-          ],
-        },
-      ],
+              attributes: ["descripcion"]
+            }
+          ]
+        }
+      ],      
     });
 
     if (!ventas.length) {
@@ -80,7 +100,14 @@ const obtenerVentaPorId = async (req, res) => {
         { 
           model: Prospecto, 
           as: "prospecto", 
-          attributes: ["nombre","nombre_contacto", "correo", "telefono", "cedula_vendedora"] 
+          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono", "cedula_vendedora"],
+          include: [
+            {
+              model: EstadoProspecto,
+              as: "estado_prospecto",
+              attributes: ["nombre"]
+            }
+          ]
         },
         { 
           model: SeguimientoVenta, 
@@ -89,6 +116,7 @@ const obtenerVentaPorId = async (req, res) => {
         },
       ],
     });
+    
 
     if (!venta) {
       return res.status(404).json({ message: "Venta no encontrada" });
@@ -122,6 +150,7 @@ const crearVenta = async (req, res) => {
 };
 
 // Cerrar una venta (marcar como cerrada)
+
 const cerrarVenta = async (req, res) => {
   try {
     const { id_venta } = req.params;
@@ -181,7 +210,6 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
   try {
     const { cedula_vendedora, estado_prospeccion } = req.query;
 
-    // Construimos la condición de filtrado
     let whereVenta = {};
     if (estado_prospeccion === "abiertas") whereVenta.abierta = 1;
     if (estado_prospeccion === "cerradas") whereVenta.abierta = 0;
@@ -192,8 +220,15 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
         {
           model: Prospecto,
           as: "prospecto",
-          attributes: ["id_prospecto", "nombre", "estado"], // 🔹 Agregamos el estado del prospecto
-          where: cedula_vendedora ? { cedula_vendedora } : undefined, // Filtrar por vendedora si se envía
+          attributes: ["id_prospecto", "nombre"],
+          where: cedula_vendedora ? { cedula_vendedora } : undefined,
+          include: [
+            {
+              model: require("../models/EstadoProspecto.model"),
+              as: "estado_prospecto",
+              attributes: ["nombre"],
+            },
+          ],
         },
         {
           model: SeguimientoVenta,
@@ -201,8 +236,8 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
           include: [
             { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] },
           ],
-          order: [["fecha_programada", "DESC"]], // Ordenar para obtener el último
-          limit: 1, // Solo el último seguimiento
+          order: [["fecha_programada", "DESC"]],
+          limit: 1,
         },
       ],
     });

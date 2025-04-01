@@ -76,11 +76,14 @@
             type: DataTypes.STRING(255),
             allowNull: true,
         },
-        estado: {
-            type: DataTypes.ENUM("nuevo", "contactar", "cita", "visita", "proformado", "no interesado", "interesado", "ganado", "perdido", "archivado"),
-            allowNull: false,
-            defaultValue: "nuevo",
-        },
+        id_estado: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+              model: 'estado_prospecto',
+              key: 'id_estado',
+            }
+          },          
         cedula_vendedora: {
             type: DataTypes.STRING(20),
             allowNull: true,
