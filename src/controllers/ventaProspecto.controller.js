@@ -100,7 +100,7 @@ const obtenerVentaPorId = async (req, res) => {
         { 
           model: Prospecto, 
           as: "prospecto", 
-          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono", "cedula_vendedora"],
+          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono", "cedula_vendedora", "created_at"],
           include: [
             {
               model: EstadoProspecto,
