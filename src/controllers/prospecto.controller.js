@@ -149,9 +149,31 @@
   
       const fechaCreacion = created_at ? new Date(created_at) : new Date();
   
-      // 🔹 Buscar el ID del estado 'nuevo'
+      // 🔹 Validar que no exista otro prospecto con la misma cédula_ruc
+      if (cedula_ruc) {
+        const existente = await Prospecto.findOne({ where: { cedula_ruc } });
+        if (existente) {
+          return res.status(400).json({ message: "Ya existe un prospecto con esa cédula o RUC." });
+        }
+      }
+  
+      // Validar que solo haya un prospecto con el mismo nombre
+      const duplicado = await Prospecto.findOne({ where: { nombre } });
+
+if (duplicado) {
+  return res.status(400).json({ message: "Ya existe un prospecto con ese nombre." });
+}
+
+  
+      if (duplicado) {
+        return res.status(400).json({ message: "Esta vendedora ya tiene un prospecto con ese nombre." });
+      }
+  
+      // 🔹 Obtener el estado "nuevo"
       const estadoNuevo = await EstadoProspecto.findOne({ where: { nombre: "nuevo" } });
-      if (!estadoNuevo) return res.status(500).json({ message: "Estado 'nuevo' no está registrado en la base de datos." });
+      if (!estadoNuevo) {
+        return res.status(500).json({ message: "Estado 'nuevo' no está registrado en la base de datos." });
+      }
   
       const nuevoProspecto = await Prospecto.create({
         cedula_ruc,
@@ -167,7 +189,7 @@
         id_categoria,
         descripcion,
         nota,
-        id_estado: estadoNuevo.id_estado, 
+        id_estado: estadoNuevo.id_estado,
         archivo: req.file ? req.file.path : null,
         cedula_vendedora: asignarVendedora,
         created_at: fechaCreacion,
