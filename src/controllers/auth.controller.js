@@ -2,7 +2,41 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Usuario = require("../models/Usuario.model");
 
-const signup = async (req, res) => { 
+
+function validarCedulaEcuatoriana(cedula) {
+  if (!cedula || cedula.length !== 10) return false;
+
+  const digitos = cedula.split("").map(Number);
+  const provincia = parseInt(cedula.substring(0, 2));
+
+  if (provincia < 1 || provincia > 24) return false;
+
+  const digitoVerificador = digitos.pop();
+  let suma = 0;
+
+  digitos.forEach((d, i) => {
+    if (i % 2 === 0) {
+      let mult = d * 2;
+      if (mult > 9) mult -= 9;
+      suma += mult;
+    } else {
+      suma += d;
+    }
+  });
+
+  const decenaSuperior = Math.ceil(suma / 10) * 10;
+  const digitoCalculado = decenaSuperior - suma;
+
+  return digitoCalculado === digitoVerificador;
+}
+
+function validarEmail(email) {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return regex.test(email);
+}
+
+
+const signup = async (req, res) => {
   try {
     const { cedula_ruc, nombre, email, password, rol } = req.body;
 
@@ -11,6 +45,22 @@ const signup = async (req, res) => {
       return res.status(400).json({ message: "Todos los campos son obligatorios" });
     }
 
+    // Validación de cédula ecuatoriana solo si tiene 10 dígitos
+    if (cedula_ruc.length === 10) {
+      if (!validarCedulaEcuatoriana(cedula_ruc)) {
+        return res.status(400).json({ message: "La cédula ingresada no es válida" });
+      }
+    } else {
+      // Validación básica para otros tipos de documento
+      if (cedula_ruc.length < 6) {
+        return res.status(400).json({ message: "Verificar el documento ingresado" });
+      }
+    }
+
+    if (!validarEmail(email)) {
+      return res.status(400).json({ message: "El correo electrónico no es válido" });
+    }
+    
     // Opcional: validar longitud mínima de la contraseña
     if (password.length < 6) {
       return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
@@ -48,7 +98,7 @@ const signup = async (req, res) => {
   }
 };
 
-const login = async (req, res) => { 
+const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -67,10 +117,10 @@ const login = async (req, res) => {
       { cedula_ruc: usuario.cedula_ruc, email: usuario.email, rol: usuario.rol },
       process.env.JWT_SECRET,
       { expiresIn: "12h" }
-    );    
+    );
 
-    res.status(200).json({ 
-      message: "Login exitoso", 
+    res.status(200).json({
+      message: "Login exitoso",
       token,
       rol: usuario.rol
     });

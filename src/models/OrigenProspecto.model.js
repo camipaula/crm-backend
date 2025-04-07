@@ -10,7 +10,6 @@ const OrigenProspecto = sequelize.define("OrigenProspecto", {
     descripcion: {
         type: DataTypes.STRING(100),
         allowNull: false,
-        unique: true,
     }
 }, {
     tableName: "origen_prospecto",

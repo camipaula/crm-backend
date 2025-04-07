@@ -10,7 +10,6 @@ const EstadoProspecto = sequelize.define("EstadoProspecto", {
   nombre: {
     type: DataTypes.STRING(50),
     allowNull: false,
-    unique: true,
   },
 }, {
   tableName: "estado_prospecto",

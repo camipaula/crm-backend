@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const Usuario = require("../models/Usuario.model");
 const Prospecto = require("../models/Prospecto.model");
 
+
 const obtenerVendedoras = async (req, res) => {
   try {
     const vendedoras = await Usuario.findAll({
@@ -45,12 +46,12 @@ const actualizarVendedora = async (req, res) => {
       return res.status(404).json({ message: "Vendedora no encontrada" });
     }
 
-    // ✅ Solo actualizar si los valores existen en req.body
+    // Solo actualizar si los valores existen en req.body
     if (nombre !== undefined) vendedora.nombre = nombre;
     if (email !== undefined) vendedora.email = email;
     if (estado !== undefined) vendedora.estado = parseInt(estado, 10);
 
-    // ✅ Si se envía una nueva contraseña, la encriptamos antes de guardarla
+    // Si se envía una nueva contraseña, la encriptamos antes de guardarla
     if (password && password.trim() !== "") {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
@@ -77,18 +78,18 @@ const eliminarVendedora = async (req, res) => {
       return res.status(404).json({ message: "Vendedora no encontrada" });
     }
 
-    // ✅ Antes de eliminar, actualizar los prospectos para que tengan vendedora en NULL
+    // Antes de eliminar, actualizar los prospectos para que tengan vendedora en NULL
     await Prospecto.update(
       { cedula_vendedora: null }, // Se pone en NULL en la base de datos
       { where: { cedula_vendedora: cedula_ruc } }
     );
 
-    // ✅ Ahora eliminar la vendedora
+    // Ahora eliminar la vendedora
     await vendedora.destroy();
 
     res.json({ message: "Vendedora eliminada correctamente. Los prospectos quedaron sin asignar." });
   } catch (error) {
-    console.error("Error al eliminar vendedora:", error); // ✅ Mostramos el error exacto en consola
+    console.error("Error al eliminar vendedora:", error); // Mostramos el error exacto en consola
     res.status(500).json({ message: "Error al eliminar vendedora", error: error.message });
   }
 };

@@ -10,7 +10,6 @@ const TipoSeguimiento = sequelize.define("TipoSeguimiento", {
     descripcion: {
         type: DataTypes.STRING(100),
         allowNull: false,
-        unique: true,
     }
 }, {
     tableName: "tipo_seguimiento",
