@@ -139,15 +139,15 @@ const crearVenta = async (req, res) => {
     const nuevaVenta = await VentaProspecto.create({
       id_prospecto,
       objetivo,
-      abierta: 1, // Se inicia como abierta
+      abierta: 1,
     });
-
-    res.status(201).json({ message: "Venta creada exitosamente", venta: nuevaVenta });
+    res.status(201).json({ id_venta: nuevaVenta.id_venta });
   } catch (error) {
     console.error(" Error al crear venta:", error);
     res.status(500).json({ message: "Error al crear venta", error });
   }
 };
+
 
 // Cerrar una venta (marcar como cerrada)
 
