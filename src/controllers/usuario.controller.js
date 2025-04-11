@@ -94,8 +94,34 @@ const eliminarVendedora = async (req, res) => {
   }
 };
 
+// Cambiar el estado de una vendedora (activar o inactivar)
+const cambiarEstadoVendedora = async (req, res) => {
+  try {
+    const { cedula_ruc } = req.params;
+    const { estado } = req.body;
+
+    const vendedora = await Usuario.findByPk(cedula_ruc);
+    if (!vendedora || vendedora.rol !== "vendedora") {
+      return res.status(404).json({ message: "Vendedora no encontrada" });
+    }
+
+    if (estado !== 0 && estado !== 1) {
+      return res.status(400).json({ message: "Estado inválido. Solo se permite 0 o 1." });
+    }
+
+    vendedora.estado = estado;
+    await vendedora.save();
+
+    res.json({ message: `Vendedora ${estado === 1 ? "activada" : "inactivada"} correctamente` });
+  } catch (error) {
+    console.error("Error al cambiar el estado de la vendedora:", error);
+    res.status(500).json({ message: "Error al cambiar el estado", error });
+  }
+};
 
 
-module.exports = { obtenerVendedoras, obtenerVendedoraPorCedula, actualizarVendedora, eliminarVendedora };
+
+
+module.exports = { obtenerVendedoras, obtenerVendedoraPorCedula, actualizarVendedora, eliminarVendedora, cambiarEstadoVendedora};
 
 

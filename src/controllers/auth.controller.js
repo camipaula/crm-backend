@@ -112,6 +112,10 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Contraseña incorrecta" });
     }
 
+    if (usuario.rol === "vendedora" && usuario.estado === 0) {
+      return res.status(403).json({ message: "Usuario inactivo. Contacte al administrador." });
+    }
+    
     // Genera el token con la cédula y el rol dentro del payload
     const token = jwt.sign(
       { cedula_ruc: usuario.cedula_ruc, email: usuario.email, rol: usuario.rol },

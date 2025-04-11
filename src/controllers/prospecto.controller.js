@@ -15,6 +15,7 @@
       const { cedula_vendedora, estado, fechaInicio, fechaFin, sector, id_categoria } = req.query;
 
       const whereClause = {};
+      whereClause.eliminado = 0;
 
       // Si el usuario es una vendedora, solo obtiene sus prospectos
       if (rol === "vendedora") {
@@ -37,14 +38,22 @@
         where: whereClause,
         include: [
           { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
-          { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
+          { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre", "estado"] },
           { model: OrigenProspecto, as: "origen_prospecto", attributes: ["descripcion"] },
           { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, 
-          { 
-            model: VentaProspecto, 
+          {
+            model: VentaProspecto,
             as: "ventas",
-            include: [{ model: SeguimientoVenta, as: "seguimientos", attributes: ["nota", "fecha_programada", "estado"] }],
+            where: { eliminado: 0 },
+            required: false, 
+            include: [{
+              model: SeguimientoVenta,
+              as: "seguimientos",
+              where: { eliminado: 0 },
+              required: false
+            }]
           }
+          
         ],
       });
 
@@ -65,18 +74,30 @@
 
       const prospecto = await Prospecto.findByPk(id_prospecto, {
         include: [
-          { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
+          { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre", "estado"] },
           { model: OrigenProspecto, as: "origen_prospecto", attributes: ["descripcion"] },
           { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, 
           { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
 
-          { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }
-        ],
+          {
+            model: VentaProspecto,
+            as: "ventas",
+            where: { eliminado: 0 },
+            required: false,
+            include: [{
+              model: SeguimientoVenta,
+              as: "seguimientos",
+              where: { eliminado: 0 },
+              required: false
+            }]
+          }
+                  ],
       });
 
-      if (!prospecto) {
-        return res.status(404).json({ message: "Prospecto no encontrado" });
-      }
+      // Validar si existe y si NO está eliminado
+    if (!prospecto || prospecto.eliminado === 1) {
+      return res.status(404).json({ message: "Prospecto no encontrado" });
+    }
 
       res.json(prospecto);
     } catch (error) {
@@ -91,12 +112,27 @@
       const { cedula_vendedora } = req.params;
 
       const prospectos = await Prospecto.findAll({
-        where: { cedula_vendedora },
+        where: { 
+          cedula_vendedora,
+          eliminado: 0, 
+        },
         include: [
           { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, 
           { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
 
-          { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }],
+          {
+            model: VentaProspecto,
+            as: "ventas",
+            where: { eliminado: 0 },
+            required: false,
+            include: [{
+              model: SeguimientoVenta,
+              as: "seguimientos",
+              where: { eliminado: 0 },
+              required: false
+            }]
+          }
+          ],
       });
 
       res.json(prospectos);
@@ -110,14 +146,28 @@
   const obtenerProspectosPorEstado = async (req, res) => {
     try {
       const { estado } = req.params;
-
       const prospectos = await Prospecto.findAll({
-        where: { estado },
+        where: { 
+          id_estado, 
+          eliminado: 0, 
+        },
         include: [
           { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] },
           { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
 
-          { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }],
+          {
+            model: VentaProspecto,
+            as: "ventas",
+            where: { eliminado: 0 },
+            required: false,
+            include: [{
+              model: SeguimientoVenta,
+              as: "seguimientos",
+              where: { eliminado: 0 },
+              required: false
+            }]
+          }
+          ],
       });
 
       res.json(prospectos);
@@ -133,48 +183,73 @@
     try {
       console.log("Usuario autenticado en crearProspecto:", req.usuario);
   
+      // Si es vendedora y está inactiva, no puede crear
+      const vendedoraLogueada = await Usuario.findByPk(req.usuario.cedula_ruc);
+      if (req.usuario.rol === "vendedora" && vendedoraLogueada.estado === 0) {
+        return res.status(403).json({ message: "No puede crear prospectos. Su cuenta está inactiva." });
+      }
+  
       const {
-        cedula_ruc, nombre, nombre_contacto, correo, telefono, direccion, provincia,
-        ciudad, sector, id_origen, id_categoria, descripcion, nota,
-        cedula_vendedora, created_at
+        cedula_ruc,
+        nombre,
+        nombre_contacto,
+        correo,
+        telefono,
+        direccion,
+        provincia,
+        ciudad,
+        sector,
+        id_origen,
+        id_categoria,
+        descripcion,
+        nota,
+        cedula_vendedora,
+        created_at,
       } = req.body;
   
+      // 🔁 Asignación de vendedora
       let asignarVendedora = cedula_vendedora;
-  
       if (req.usuario.rol === "vendedora") {
         asignarVendedora = req.usuario.cedula_ruc;
       } else if (!asignarVendedora) {
         return res.status(400).json({ message: "Debe asignar una vendedora al prospecto." });
       }
   
+      // Validar que la vendedora asignada esté activa
+      const vendedoraAsignada = await Usuario.findByPk(asignarVendedora);
+      if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
+        return res.status(400).json({ message: "No se puede asignar una vendedora inactiva al prospecto." });
+      }
+  
+      // Fecha
       const fechaCreacion = created_at ? new Date(created_at) : new Date();
   
-      // 🔹 Validar que no exista otro prospecto con la misma cédula_ruc
+      // Validar duplicado por cédula
       if (cedula_ruc) {
-        const existente = await Prospecto.findOne({ where: { cedula_ruc } });
+        const existente = await Prospecto.findOne({
+          where: { cedula_ruc, eliminado: 0 }
+        });
         if (existente) {
           return res.status(400).json({ message: "Ya existe un prospecto con esa cédula o RUC." });
         }
       }
+      
   
-      // Validar que solo haya un prospecto con el mismo nombre
-      const duplicado = await Prospecto.findOne({ where: { nombre } });
-
-if (duplicado) {
-  return res.status(400).json({ message: "Ya existe un prospecto con ese nombre." });
-}
-
-  
+      // Validar duplicado por nombre
+      const duplicado = await Prospecto.findOne({
+        where: { nombre, eliminado: 0 }
+      });
       if (duplicado) {
-        return res.status(400).json({ message: "Esta vendedora ya tiene un prospecto con ese nombre." });
+        return res.status(400).json({ message: "Ya existe un prospecto con ese nombre." });
       }
   
-      // 🔹 Obtener el estado "nuevo"
+      // Obtener estado "nuevo"
       const estadoNuevo = await EstadoProspecto.findOne({ where: { nombre: "nuevo" } });
       if (!estadoNuevo) {
         return res.status(500).json({ message: "Estado 'nuevo' no está registrado en la base de datos." });
       }
   
+      // Crear prospecto
       const nuevoProspecto = await Prospecto.create({
         cedula_ruc,
         nombre,
@@ -193,6 +268,7 @@ if (duplicado) {
         archivo: req.file ? req.file.path : null,
         cedula_vendedora: asignarVendedora,
         created_at: fechaCreacion,
+        eliminado: 0,
       });
   
       res.status(201).json({ message: "Prospecto creado exitosamente", prospecto: nuevoProspecto });
@@ -202,7 +278,6 @@ if (duplicado) {
     }
   };
   
-
 
   // Actualizar un prospecto
   const actualizarProspecto = async (req, res) => {
@@ -218,7 +293,17 @@ if (duplicado) {
         return res.status(404).json({ message: "Prospecto no encontrado" });
       }
   
+      // 🟨 Validar que la vendedora asignada esté activa
       const vendedoraAsignada = cedula_vendedora === "" ? null : cedula_vendedora;
+      if (vendedoraAsignada) {
+        const vendedora = await Usuario.findByPk(vendedoraAsignada);
+        if (!vendedora || vendedora.rol !== "vendedora") {
+          return res.status(400).json({ message: "La vendedora asignada no existe" });
+        }
+        if (vendedora.estado === 0) {
+          return res.status(400).json({ message: "No se puede asignar una vendedora inactiva" });
+        }
+      }
   
       prospecto.nombre = nombre ?? prospecto.nombre;
       prospecto.nombre_contacto = nombre_contacto ?? prospecto.nombre_contacto;
@@ -231,7 +316,7 @@ if (duplicado) {
       prospecto.id_origen = id_origen ?? prospecto.id_origen;
       prospecto.id_categoria = id_categoria ?? prospecto.id_categoria;
       prospecto.descripcion = descripcion ?? prospecto.descripcion;
-      prospecto.id_estado = id_estado ?? prospecto.id_estado; // ✅ usamos id_estado aquí
+      prospecto.id_estado = id_estado ?? prospecto.id_estado;
       prospecto.nota = nota ?? prospecto.nota;
       prospecto.cedula_vendedora = vendedoraAsignada;
   
@@ -248,9 +333,52 @@ if (duplicado) {
     }
   };
   
+  
+// Eliminar (lógicamente) un prospecto y sus ventas y seguimientos
+const eliminarProspecto = async (req, res) => {
+  try {
+    const { id_prospecto } = req.params;
+
+    const prospecto = await Prospecto.findByPk(id_prospecto, {
+      include: {
+        model: VentaProspecto,
+        as: "ventas",
+        include: {
+          model: SeguimientoVenta,
+          as: "seguimientos"
+        }
+      }
+    });
+
+    if (!prospecto || prospecto.eliminado === 1) {
+      return res.status(404).json({ message: "Prospecto no encontrado o ya fue eliminado" });
+    }
+
+    // Marcar prospecto como eliminado
+    prospecto.eliminado = 1;
+    await prospecto.save();
+
+    // Marcar ventas y seguimientos como eliminados
+    for (const venta of prospecto.ventas) {
+      venta.eliminado = 1;
+      await venta.save();
+
+      for (const seguimiento of venta.seguimientos) {
+        seguimiento.eliminado = 1;
+        await seguimiento.save();
+      }
+    }
+
+    res.json({ message: "Prospecto y ventas eliminadas lógicamente" });
+  } catch (error) {
+    console.error("Error al eliminar prospecto:", error);
+    res.status(500).json({ message: "Error al eliminar prospecto", error });
+  }
+};
 
 
-  // Eliminar un prospecto
+
+  /*// Eliminar un prospecto de la base de datos 
   const eliminarProspecto = async (req, res) => {
     try {
       const { id_prospecto } = req.params;
@@ -263,14 +391,18 @@ if (duplicado) {
       console.error(" Error al eliminar prospecto:", error);
       res.status(500).json({ message: "Error al eliminar prospecto", error });
     }
-  };
+  };*/ 
 
   // Obtener todos los sectores únicos de los prospectos
   const obtenerSectores = async (req, res) => {
     try {
       const sectores = await Prospecto.findAll({
         attributes: [[Sequelize.fn("DISTINCT", Sequelize.col("sector")), "sector"]],
-        where: { sector: { [Op.ne]: null } },
+        where: {
+          eliminado: 0,
+          sector: { [Op.ne]: null }
+        }
+        ,
         order: [["sector", "ASC"]],
       });
 
@@ -301,12 +433,28 @@ if (duplicado) {
       const { id_categoria } = req.params;
 
       const prospectos = await Prospecto.findAll({
-        where: { id_categoria },
+        where: {
+          id_categoria,
+          eliminado: 0
+        }
+        ,
         include: [
           { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
           { model: OrigenProspecto, as: "origen_prospecto", attributes: ["descripcion"] },
           { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }, 
-          { model: VentaProspecto, as: "ventas", include: [{ model: SeguimientoVenta, as: "seguimientos" }] }
+          {
+            model: VentaProspecto,
+            as: "ventas",
+            where: { eliminado: 0 },
+            required: false,
+            include: [{
+              model: SeguimientoVenta,
+              as: "seguimientos",
+              where: { eliminado: 0 },
+              required: false
+            }]
+          }
+          
         ],
       });
 
@@ -323,7 +471,7 @@ if (duplicado) {
       const { cedula_ruc, rol } = req.usuario;
       const { cedula_vendedora, estado, fechaInicio, fechaFin, sector } = req.query;
 
-      const whereClause = {};
+      const whereClause = { eliminado: 0 };
 
       if (rol === "vendedora") {
         whereClause.cedula_vendedora = cedula_ruc;
@@ -346,11 +494,19 @@ if (duplicado) {
 
           { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
           { model: OrigenProspecto, as: "origen_prospecto", attributes: ["descripcion"] },
-          { 
-            model: VentaProspecto, 
+          {
+            model: VentaProspecto,
             as: "ventas",
-            include: [{ model: SeguimientoVenta, as: "seguimientos", attributes: ["nota", "fecha_programada", "estado"] }],
+            where: { eliminado: 0 },
+            required: false, // para que traiga prospectos aunque no tengan ventas
+            include: [{
+              model: SeguimientoVenta,
+              as: "seguimientos",
+              where: { eliminado: 0 },
+              required: false
+            }]
           }
+          
         ],
       });
 

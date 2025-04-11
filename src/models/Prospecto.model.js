@@ -92,7 +92,11 @@
                 key: "cedula_ruc"
             },
             onDelete: "SET NULL", // Si se borra la vendedora, el campo se pone en NULL
-        }
+        },
+        eliminado: {
+            type: DataTypes.TINYINT,
+            defaultValue: 0
+          }          
     }, {
         tableName: "prospecto",
         timestamps: true,  

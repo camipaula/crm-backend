@@ -57,7 +57,11 @@ const SeguimientoVenta = sequelize.define("SeguimientoVenta", {
         type: DataTypes.ENUM("pendiente", "realizado", "cancelado"),
         allowNull: false,
         defaultValue: "pendiente",
-    }
+    },
+    eliminado: {
+        type: DataTypes.TINYINT,
+        defaultValue: 0
+      }      
 }, {
     tableName: "seguimiento_venta",
     timestamps: true,  

@@ -29,7 +29,11 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
     fecha_cierre: {
         type: DataTypes.DATE,
         allowNull: true,
-    }
+    },
+    eliminado: {
+        type: DataTypes.TINYINT,
+        defaultValue: 0
+      }      
 }, {
     tableName: "venta_prospecto",
     timestamps: true,  

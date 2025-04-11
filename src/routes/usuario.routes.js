@@ -1,5 +1,11 @@
 const express = require("express");
-const { obtenerVendedoras,obtenerVendedoraPorCedula, actualizarVendedora, eliminarVendedora} = require("../controllers/usuario.controller");
+const { 
+    obtenerVendedoras,
+    obtenerVendedoraPorCedula, 
+    actualizarVendedora, 
+    eliminarVendedora, 
+    cambiarEstadoVendedora,
+} = require("../controllers/usuario.controller");
 
 const router = express.Router();
 
@@ -11,6 +17,9 @@ router.get("/vendedoras/:cedula_ruc", obtenerVendedoraPorCedula);
 
 // Ruta para Editar Vendedora
 router.put("/vendedoras/:cedula_ruc", actualizarVendedora);
+
+// Ruta para inactivar vendedora (opcional si prefieres separarla)
+router.patch("/vendedoras/:cedula_ruc/inactivar", cambiarEstadoVendedora);
 
 // Ruta para eliminar Vendedora
 router.delete("/vendedoras/:cedula_ruc", eliminarVendedora);

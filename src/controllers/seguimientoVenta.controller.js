@@ -18,6 +18,7 @@ function parseLocalDatetime(datetimeStr) {
 const obtenerSeguimientos = async (req, res) => {
   try {
     const seguimientos = await SeguimientoVenta.findAll({
+      where: { eliminado: 0 }, 
       include: [
         { model: VentaProspecto, as: "venta", attributes: ["objetivo"] },
         { model: Usuario, as: "vendedora_seguimiento", attributes: ["nombre"] },
@@ -37,19 +38,31 @@ const obtenerSeguimientoPorId = async (req, res) => {
   try {
     const { id_seguimiento } = req.params;
 
-    const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento, {
+    const seguimiento = await SeguimientoVenta.findOne({
+      where: { id_seguimiento, eliminado: 0 }, // ✅ Solo los no eliminados
       include: [
         {
           model: VentaProspecto,
           as: "venta",
-          include: [{
-            model: Prospecto,
-            as: "prospecto",
-            include: [{ model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] }]
-          }]
+          include: [
+            {
+              model: Prospecto,
+              as: "prospecto",
+              include: [
+                {
+                  model: EstadoProspecto,
+                  as: "estado_prospecto",
+                  attributes: ["nombre"]
+                }
+              ]
+            }
+          ]
         },
-        { model: TipoSeguimiento, as: "tipo_seguimiento" },
-      ],
+        {
+          model: TipoSeguimiento,
+          as: "tipo_seguimiento"
+        }
+      ]
     });
 
     if (!seguimiento) {
@@ -58,10 +71,11 @@ const obtenerSeguimientoPorId = async (req, res) => {
 
     res.json(seguimiento);
   } catch (error) {
-    console.error(" Error al obtener seguimiento:", error);
+    console.error("Error al obtener seguimiento:", error);
     res.status(500).json({ message: "Error al obtener seguimiento", error });
   }
 };
+
 
 
 //Obtener seguimiento por vendedora 
@@ -79,6 +93,8 @@ const obtenerSeguimientosPorVendedora = async (req, res) => {
         {
           model: SeguimientoVenta,
           as: "seguimientos",
+          where: { eliminado: 0 }, 
+          required: false,
           include: [{ model: TipoSeguimiento, as: "tipo_seguimiento" }]
         }
       ],
@@ -101,6 +117,7 @@ const obtenerAgendaPorVendedora = async (req, res) => {
       where: {
         cedula_vendedora,
         estado: "pendiente",
+        eliminado: 0  
       },
       include: [
         {
@@ -136,6 +153,12 @@ const crearSeguimiento = async (req, res) => {
   try {
     const { id_venta, cedula_vendedora, fecha_programada, id_tipo, motivo, nota } = req.body;
     const fechaUTC = parseLocalDatetime(fecha_programada);
+// Obtener la vendedora asociada al prospecto o al seguimiento
+const vendedoraAsignada = await Usuario.findByPk(cedula_vendedora);
+if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
+  return res.status(400).json({ message: "No se puede asignar seguimiento a una vendedora inactiva." });
+}
+
 
     const nuevoSeguimiento = await SeguimientoVenta.create({
       id_venta,
@@ -157,83 +180,84 @@ const crearSeguimiento = async (req, res) => {
   }
 };
 
-// Registrar el resultado de un seguimiento
-const registrarResultadoSeguimiento = async (req, res) => {
-  try {
-    const { id_seguimiento } = req.params;
-    const { resultado, nota, estado } = req.body; // `estado` es un string, como "ganado"
+  // Registrar el resultado de un seguimiento
+  const registrarResultadoSeguimiento = async (req, res) => {
+    try {
+      const { id_seguimiento } = req.params;
+      const { resultado, nota, estado } = req.body; // `estado` es un string, como "ganado"
 
-    const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento, {
-      include: [
-        {
-          model: VentaProspecto,
-          as: "venta",
-          include: [{ model: Prospecto, as: "prospecto" }],
-        },
-      ],
-    });
-
-    if (!seguimiento) {
-      return res.status(404).json({ message: "Seguimiento no encontrado" });
-    }
-
-    // Marcar seguimiento como realizado
-    seguimiento.resultado = resultado;
-    seguimiento.nota = nota;
-    seguimiento.estado = "realizado";
-    await seguimiento.save();
-
-    const venta = seguimiento.venta;
-    const prospecto = venta.prospecto;
-
-    // Buscar ID del nuevo estado (por nombre)
-    const nuevoEstado = await EstadoProspecto.findOne({ where: { nombre: estado } });
-    if (!nuevoEstado) {
-      return res.status(400).json({ message: `El estado '${estado}' no está registrado.` });
-    }
-
-    // Si el estado es cierre, cerrar la venta
-    if (["ganado", "perdido"].includes(estado)) {
-      venta.abierta = 0;
-      venta.fecha_cierre = new Date();
-      await venta.save();
-
-      // ¿Hay otra venta abierta?
-      const otraAbierta = await VentaProspecto.findOne({
-        where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
+      const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento, {
+        include: [
+          {
+            model: VentaProspecto,
+            as: "venta",
+            include: [{ model: Prospecto, as: "prospecto" }],
+          },
+        ],
       });
 
-      // Si hay otra venta abierta, el prospecto queda como "interesado"
-      if (otraAbierta) {
-        const estadoInteresado = await EstadoProspecto.findOne({ where: { nombre: "interesado" } });
-        if (!estadoInteresado) {
-          return res.status(400).json({ message: "Estado 'interesado' no está registrado." });
+      if (!seguimiento || seguimiento.eliminado === 1) {
+        return res.status(404).json({ message: "Seguimiento no encontrado" });
+      }
+      
+
+      // Marcar seguimiento como realizado
+      seguimiento.resultado = resultado;
+      seguimiento.nota = nota;
+      seguimiento.estado = "realizado";
+      await seguimiento.save();
+
+      const venta = seguimiento.venta;
+      const prospecto = venta.prospecto;
+
+      // Buscar ID del nuevo estado (por nombre)
+      const nuevoEstado = await EstadoProspecto.findOne({ where: { nombre: estado } });
+      if (!nuevoEstado) {
+        return res.status(400).json({ message: `El estado '${estado}' no está registrado.` });
+      }
+
+      // Si el estado es cierre, cerrar la venta
+      if (["ganado", "perdido"].includes(estado)) {
+        venta.abierta = 0;
+        venta.fecha_cierre = new Date();
+        await venta.save();
+
+        // ¿Hay otra venta abierta?
+        const otraAbierta = await VentaProspecto.findOne({
+          where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
+        });
+
+        // Si hay otra venta abierta, el prospecto queda como "interesado"
+        if (otraAbierta) {
+          const estadoInteresado = await EstadoProspecto.findOne({ where: { nombre: "interesado" } });
+          if (!estadoInteresado) {
+            return res.status(400).json({ message: "Estado 'interesado' no está registrado." });
+          }
+          prospecto.id_estado = estadoInteresado.id_estado;
+        } else {
+          // Si no, se asigna el estado real de cierre
+          prospecto.id_estado = nuevoEstado.id_estado;
         }
-        prospecto.id_estado = estadoInteresado.id_estado;
       } else {
-        // Si no, se asigna el estado real de cierre
+        // Si no es cierre, simplemente actualizamos el estado
         prospecto.id_estado = nuevoEstado.id_estado;
       }
-    } else {
-      // Si no es cierre, simplemente actualizamos el estado
-      prospecto.id_estado = nuevoEstado.id_estado;
+
+      await prospecto.save();
+
+      res.json({
+        message: "Seguimiento actualizado correctamente",
+        seguimiento,
+        venta,
+        prospecto,
+      });
+    } catch (error) {
+      console.error("Error al actualizar seguimiento:", error);
+      res.status(500).json({ message: "Error al actualizar seguimiento", error });
     }
+  };
 
-    await prospecto.save();
-
-    res.json({
-      message: "Seguimiento actualizado correctamente",
-      seguimiento,
-      venta,
-      prospecto,
-    });
-  } catch (error) {
-    console.error("Error al actualizar seguimiento:", error);
-    res.status(500).json({ message: "Error al actualizar seguimiento", error });
-  }
-};
-
-// Eliminar un seguimiento
+/*// Eliminar un seguimiento
 const eliminarSeguimiento = async (req, res) => {
   try {
     const { id_seguimiento } = req.params;
@@ -247,7 +271,22 @@ const eliminarSeguimiento = async (req, res) => {
     console.error(" Error al eliminar seguimiento:", error);
     res.status(500).json({ message: "Error al eliminar seguimiento", error });
   }
+};*/
+
+// Eliminar un seguimiento
+const eliminarSeguimiento = async (req, res) => {
+  const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento);
+if (!seguimiento || seguimiento.eliminado === 1) {
+  return res.status(404).json({ message: "Seguimiento no encontrado" });
+}
+
+seguimiento.eliminado = 1;
+await seguimiento.save();
+
+res.json({ message: "Seguimiento eliminado correctamente" });
+
 };
+
 
 // Obtener el historial de seguimientos de una venta específica
 const obtenerHistorialPorVenta = async (req, res) => {
@@ -255,7 +294,7 @@ const obtenerHistorialPorVenta = async (req, res) => {
     const { id_venta } = req.params;
 
     const historial = await SeguimientoVenta.findAll({
-      where: { id_venta },
+      where: { id_venta, eliminado: 0 },
       include: [{ model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] }],
       order: [["fecha_programada", "DESC"]],
     });
@@ -288,7 +327,7 @@ const exportarSeguimientos = async (req, res) => {
   try {
     const { cedula_vendedora, id_prospecto, estado_venta } = req.query;
 
-    const whereClause = {};
+    const whereClause = { eliminado: 0 };
 
     if (cedula_vendedora) {
       whereClause["$venta.prospecto.cedula_vendedora$"] = cedula_vendedora;
@@ -390,7 +429,7 @@ const obtenerAgendaGeneral = async (req, res) => {
     }
 
     const agenda = await SeguimientoVenta.findAll({
-      where: { estado: "pendiente", ...whereCondition },
+      where: { estado: "pendiente",eliminado: 0, ...whereCondition },
       include: [
         {
           model: VentaProspecto,
@@ -462,9 +501,10 @@ const editarSeguimiento = async (req, res) => {
       ]
     });
 
-    if (!seguimiento) {
+    if (!seguimiento || seguimiento.eliminado === 1) {
       return res.status(404).json({ message: "Seguimiento no encontrado" });
     }
+    
 
     if (seguimiento.estado !== "pendiente") {
       return res.status(400).json({ message: "Solo se pueden editar seguimientos pendientes" });

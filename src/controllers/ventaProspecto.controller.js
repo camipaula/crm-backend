@@ -3,27 +3,36 @@ const Prospecto = require("../models/Prospecto.model");
 const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model"); 
+const Usuario = require("../models/Usuario.model");
 
 // Obtener todas las ventas de prospectos con sus seguimientos
 const obtenerVentas = async (req, res) => {
   try {
     const ventas = await VentaProspecto.findAll({
+      where: { eliminado: 0 },
       include: [
         {
           model: Prospecto,
           as: "prospecto",
-          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono"],
+          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono", "cedula_vendedora"],
           include: [
             {
               model: EstadoProspecto,
               as: "estado_prospecto",
               attributes: ["nombre"],
+            },
+            {
+              model: Usuario,
+              as: "vendedora_prospecto",
+              attributes: ["nombre", "estado"],
             }
           ]
         },        
         {
           model: SeguimientoVenta,
           as: "seguimientos",
+          where: { eliminado: 0 },
+          required: false,
           include: [
             {
               model: TipoSeguimiento,
@@ -50,23 +59,33 @@ const obtenerVentasPorProspecto = async (req, res) => {
     const { id_prospecto } = req.params;
 
     const ventas = await VentaProspecto.findAll({
-      where: { id_prospecto },
+      where: {
+        id_prospecto,
+        eliminado: 0 
+      },
       include: [
         {
           model: Prospecto,
           as: "prospecto",
-          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono"],
+          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono","cedula_vendedora"],
           include: [
             {
               model: EstadoProspecto,
               as: "estado_prospecto",
               attributes: ["nombre"]
+            },
+            {
+              model: Usuario,
+              as: "vendedora_prospecto",
+              attributes: ["nombre", "estado"],
             }
           ]
         },
         {
           model: SeguimientoVenta,
           as: "seguimientos",
+          where: { eliminado: 0 },
+          required: false, 
           include: [
             {
               model: TipoSeguimiento,
@@ -100,27 +119,37 @@ const obtenerVentaPorId = async (req, res) => {
         { 
           model: Prospecto, 
           as: "prospecto", 
-          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono", "cedula_vendedora", "created_at"],
+          attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono",  "direccion", "cedula_vendedora", "created_at"],
           include: [
             {
               model: EstadoProspecto,
               as: "estado_prospecto",
               attributes: ["nombre"]
+            },
+            {
+              model: Usuario,
+              as: "vendedora_prospecto",
+              attributes: ["nombre", "estado"]
             }
           ]
         },
         { 
           model: SeguimientoVenta, 
           as: "seguimientos",
-          include: [{ model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] }]
+          where: { eliminado: 0 },
+          required: false, 
+          include: [
+            { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] }
+          ]
         },
       ],
     });
     
 
-    if (!venta) {
+    if (!venta || venta.eliminado === 1) {
       return res.status(404).json({ message: "Venta no encontrada" });
     }
+    
 
     res.json(venta);
   } catch (error) {
@@ -140,6 +169,7 @@ const crearVenta = async (req, res) => {
       id_prospecto,
       objetivo,
       abierta: 1,
+      eliminado: 0,
     });
     res.status(201).json({ id_venta: nuevaVenta.id_venta });
   } catch (error) {
@@ -147,6 +177,7 @@ const crearVenta = async (req, res) => {
     res.status(500).json({ message: "Error al crear venta", error });
   }
 };
+
 
 
 // Cerrar una venta (marcar como cerrada)
@@ -189,7 +220,7 @@ const editarObjetivoVenta = async (req, res) => {
 };
 
 
-// Eliminar una venta
+/*// Eliminar una venta
 const eliminarVenta = async (req, res) => {
   try {
     const { id_venta } = req.params;
@@ -203,14 +234,49 @@ const eliminarVenta = async (req, res) => {
     console.error(" Error al eliminar venta:", error);
     res.status(500).json({ message: "Error al eliminar venta", error });
   }
+};*/
+
+// Eliminar una venta (eliminación lógica)
+const eliminarVenta = async (req, res) => {
+  try {
+    const { id_venta } = req.params;
+
+    const venta = await VentaProspecto.findByPk(id_venta, {
+      include: {
+        model: SeguimientoVenta,
+        as: "seguimientos"
+      }
+    });
+
+    if (!venta || venta.eliminado === 1) {
+      return res.status(404).json({ message: "Venta no encontrada" });
+    }
+
+    //Marcar venta como eliminada
+    venta.eliminado = 1;
+    await venta.save();
+
+    //Marcar todos los seguimientos como eliminados
+    for (const seguimiento of venta.seguimientos) {
+      seguimiento.eliminado = 1;
+      await seguimiento.save();
+    }
+
+    res.json({ message: "Venta y seguimientos eliminados correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar venta:", error);
+    res.status(500).json({ message: "Error al eliminar venta", error });
+  }
 };
+
+
 
 
 const obtenerProspeccionesAgrupadas = async (req, res) => {
   try {
     const { cedula_vendedora, estado_prospeccion } = req.query;
 
-    let whereVenta = {};
+    let whereVenta = { eliminado: 0 }; 
     if (estado_prospeccion === "abiertas") whereVenta.abierta = 1;
     if (estado_prospeccion === "cerradas") whereVenta.abierta = 0;
 
@@ -220,22 +286,29 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
         {
           model: Prospecto,
           as: "prospecto",
-          attributes: ["id_prospecto", "nombre"],
+          attributes: ["id_prospecto", "nombre", "cedula_vendedora"],
           where: cedula_vendedora ? { cedula_vendedora } : undefined,
           include: [
             {
-              model: require("../models/EstadoProspecto.model"),
+              model: EstadoProspecto,
               as: "estado_prospecto",
               attributes: ["nombre"],
             },
+            {
+              model: Usuario,
+              as: "vendedora_prospecto",
+              attributes: ["nombre", "estado"],
+            }
           ],
         },
+        
         {
           model: SeguimientoVenta,
           as: "seguimientos",
           include: [
             { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] },
           ],
+          required: false,
           order: [["fecha_programada", "DESC"]],
           limit: 1,
         },
