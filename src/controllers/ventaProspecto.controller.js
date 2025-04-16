@@ -239,35 +239,41 @@
   // Eliminar una venta (eliminación lógica)
   const eliminarVenta = async (req, res) => {
     try {
+      // Validar si el usuario tiene permiso (debe ser admin)
+      if (req.usuario.rol !== "admin") {
+        return res.status(403).json({ message: "Acceso denegado. Solo la administradora puede eliminar ventas." });
+      }
+  
       const { id_venta } = req.params;
-
+  
       const venta = await VentaProspecto.findByPk(id_venta, {
         include: {
           model: SeguimientoVenta,
           as: "seguimientos"
         }
       });
-
+  
       if (!venta || venta.eliminado === 1) {
         return res.status(404).json({ message: "Venta no encontrada" });
       }
-
-      //Marcar venta como eliminada
+  
+      // Eliminar lógicamente la venta
       venta.eliminado = 1;
       await venta.save();
-
-      //Marcar todos los seguimientos como eliminados
+  
+      // Eliminar lógicamente los seguimientos relacionados
       for (const seguimiento of venta.seguimientos) {
         seguimiento.eliminado = 1;
         await seguimiento.save();
       }
-
+  
       res.json({ message: "Venta y seguimientos eliminados correctamente" });
     } catch (error) {
       console.error("Error al eliminar venta:", error);
       res.status(500).json({ message: "Error al eliminar venta", error });
     }
   };
+  
 
 
 

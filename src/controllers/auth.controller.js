@@ -6,7 +6,7 @@ const Usuario = require("../models/Usuario.model");
 function validarCedulaEcuatoriana(cedula) {
   if (!cedula || cedula.length !== 10) return false;
 
-  const digitos = cedula.split("").map(Number);
+  const digitos = cedula.split("").map(Number); //convierte la cédula de string a array
   const provincia = parseInt(cedula.substring(0, 2));
 
   if (provincia < 1 || provincia > 24) return false;
@@ -118,7 +118,7 @@ const login = async (req, res) => {
     
     // Genera el token con la cédula y el rol dentro del payload
     const token = jwt.sign(
-      { cedula_ruc: usuario.cedula_ruc, email: usuario.email, rol: usuario.rol },
+      { cedula_ruc: usuario.cedula_ruc, email: usuario.email, rol: usuario.rol, nombre: usuario.nombre },
       process.env.JWT_SECRET,
       { expiresIn: "12h" }
     );

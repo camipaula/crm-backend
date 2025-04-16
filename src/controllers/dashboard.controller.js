@@ -1,87 +1,130 @@
 const { Sequelize, Op } = require("sequelize");
 const Prospecto = require("../models/Prospecto.model");
-const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const VentaProspecto = require("../models/VentaProspecto.model");
-const Usuario = require("../models/Usuario.model");
-const CategoriaProspecto = require("../models/CategoriaProspecto.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model");
+const Usuario = require("../models/Usuario.model");
+
+const estadosInteres = ["interesado", "cita", "proformado", "ensayo"];
 
 const obtenerDashboard = async (req, res) => {
   try {
-    const { cedula_vendedora, mes } = req.query;
-    let filtroVendedora = {};
+    const {
+      fecha_inicio,
+      fecha_fin,
+      cedula_vendedora,
+      id_categoria,
+      id_origen,
+      sector,
+      ciudad
+    } = req.query;
 
-    if (cedula_vendedora) {
-      filtroVendedora = { cedula_vendedora };
+    const filtrosVenta = { eliminado: 0 };
+    const filtrosProspecto = { eliminado: 0 };
+
+    // Validar fechas antes de usarlas
+    if (fecha_inicio && fecha_fin) {
+      filtrosVenta.created_at = {
+        [Op.between]: [new Date(fecha_inicio), new Date(fecha_fin)]
+      };
+      
     }
 
-    // 1️⃣ Prospectos por Estado
-    const prospectosPorEstado = await Prospecto.findAll({
-      where: filtroVendedora,
-      attributes: [
-        [Sequelize.col("estado_prospecto.nombre"), "estado"],
-        [Sequelize.fn("COUNT", Sequelize.col("Prospecto.id_estado")), "cantidad"],
-      ],
-      include: [{
-        model: EstadoProspecto,
-        as: "estado_prospecto",
-        attributes: [], // No lo traemos en el objeto directamente, solo usamos su nombre
-      }],
-      group: ["estado_prospecto.nombre", "Prospecto.id_estado"],
+    if (cedula_vendedora) filtrosProspecto.cedula_vendedora = cedula_vendedora;
+    if (id_categoria) filtrosProspecto.id_categoria = id_categoria;
+    if (id_origen) filtrosProspecto.id_origen = id_origen;
+    if (sector) filtrosProspecto.sector = sector;
+    if (ciudad) filtrosProspecto.ciudad = ciudad;
+
+    // Buscar ventas con prospecto y sus relaciones
+    const ventas = await VentaProspecto.findAll({
+      where: filtrosVenta,
+      include: [
+        {
+          model: Prospecto,
+          as: "prospecto",
+          where: filtrosProspecto,
+          required: true,
+          include: [
+            { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
+            { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] }
+          ]
+        }
+      ]
     });
 
-    // 2️⃣ Ventas Abiertas vs Cerradas
-    const ventasAbiertasCerradas = await VentaProspecto.findAll({
-      attributes: [
-        [Sequelize.literal("CASE WHEN abierta = 1 THEN 'Abiertas' ELSE 'Cerradas' END"), "estado"],
-        [Sequelize.fn("COUNT", Sequelize.col("id_venta")), "cantidad"],
-      ],
-      group: ["estado"],
+    const totalVentas = ventas.length;
+    const ventasCerradas = ventas.filter(v => v.abierta === 0);
+
+    const porcentajeCerradas = totalVentas > 0 ? (ventasCerradas.length / totalVentas) * 100 : 0;
+
+    const tablaCierres = ventasCerradas.map(v => {
+      const creada = new Date(v.created_at);
+      const cerrada = v.fecha_cierre ? new Date(v.fecha_cierre) : null;
+      const dias = cerrada ? Math.ceil((cerrada - creada) / (1000 * 60 * 60 * 24)) : 0;
+      return {
+        prospecto: v.prospecto.nombre,
+        fecha_apertura: creada,
+        fecha_cierre: cerrada,
+        dias
+      };
     });
 
-    // 3️⃣ Seguimientos Realizados vs Pendientes
-    const seguimientosRealizadosPendientes = await SeguimientoVenta.findAll({
-      attributes: ["estado", [Sequelize.fn("COUNT", Sequelize.col("estado")), "cantidad"]],
-      group: ["estado"],
+    const promedioDiasCierre = tablaCierres.length > 0
+      ? Math.round(tablaCierres.reduce((sum, r) => sum + r.dias, 0) / tablaCierres.length)
+      : 0;
+
+    const graficoVentas = [
+      { estado: "Abiertas", cantidad: totalVentas - ventasCerradas.length },
+      { estado: "Cerradas", cantidad: ventasCerradas.length }
+    ];
+
+    // Todos los prospectos para graficar estados
+    const estadosProspectos = await Prospecto.findAll({
+      where: filtrosProspecto,
+      include: [
+        { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] }
+      ]
     });
 
-    // 4️⃣ Prospectos por Categoría
-    const prospectosPorCategoria = await Prospecto.findAll({
-      attributes: [
-        [Sequelize.col("categoria_prospecto.nombre"), "categoria"], // Nombre de la categoría
-        [Sequelize.fn("COUNT", Sequelize.col("Prospecto.id_categoria")), "cantidad"], // Contar prospectos
-      ],
-      group: ["Prospecto.id_categoria", "categoria_prospecto.nombre"],
-      include: [{ model: CategoriaProspecto, as: "categoria_prospecto", attributes: [] }], // Unir con categoría
-    });
-    
-
-    // 5️⃣ Prospectos Nuevos por Mes y Vendedora
-    let filtroFecha = {};
-    if (mes) {
-      filtroFecha = Sequelize.where(Sequelize.fn("MONTH", Sequelize.col("created_at")), mes);
-    }
-
-    const prospectosNuevos = await Prospecto.findAll({
-      where: { ...filtroVendedora, ...filtroFecha },
-      attributes: [
-        "cedula_vendedora",
-        [Sequelize.fn("COUNT", Sequelize.col("id_prospecto")), "cantidad"],
-      ],
-      group: ["cedula_vendedora"],
-      include: [{ model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] }],
+    const resumenEstados = {};
+    estadosProspectos.forEach(p => {
+      const estado = p.estado_prospecto?.nombre || "Desconocido";
+      resumenEstados[estado] = (resumenEstados[estado] || 0) + 1;
     });
 
-    res.json({
-      prospectosPorEstado,
-      ventasAbiertasCerradas,
-      seguimientosRealizadosPendientes,
-      prospectosPorCategoria,
-      prospectosNuevos,
+    const graficoEstadosProspecto = Object.entries(resumenEstados).map(([estado, cantidad]) => ({
+      estado,
+      cantidad
+    }));
+
+    const prospectosConInteres = estadosProspectos.filter(p =>
+      estadosInteres.includes(p.estado_prospecto?.nombre)
+    );
+
+    const cerradosDesdeInteres = ventasCerradas.filter(v =>
+      estadosInteres.includes(v.prospecto.estado_prospecto?.nombre)
+    );
+
+    const totalInteresados = prospectosConInteres.length;
+    const porcentajeInteres = estadosProspectos.length > 0
+      ? (totalInteresados / estadosProspectos.length) * 100
+      : 0;
+
+    return res.json({
+      porcentajeCerradas,
+      tablaCierres,
+      promedioDiasCierre,
+      graficoVentas,
+      graficoEstadosProspecto,
+      interes: {
+        total: totalInteresados,
+        porcentaje: porcentajeInteres,
+        cerrados: cerradosDesdeInteres.length
+      }
     });
   } catch (error) {
-    console.error("Error obteniendo dashboard:", error);
-    res.status(500).json({ message: "Error obteniendo dashboard", error });
+    console.error(" Error en dashboard:", error);
+    return res.status(500).json({ message: "Error obteniendo dashboard", error: error.message });
   }
 };
 

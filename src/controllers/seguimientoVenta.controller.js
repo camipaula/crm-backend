@@ -153,6 +153,16 @@ const crearSeguimiento = async (req, res) => {
   try {
     const { id_venta, cedula_vendedora, fecha_programada, id_tipo, motivo, nota } = req.body;
     const fechaUTC = parseLocalDatetime(fecha_programada);
+
+    // Validación: No más de 1 año en adelante
+    const hoy = new Date();
+    const maxFecha = new Date();
+    maxFecha.setFullYear(hoy.getFullYear() + 1);
+
+    if (fechaUTC > maxFecha) {
+      return res.status(400).json({ message: "La fecha programada no puede ser mayor a un año desde hoy." });
+    } 
+
 // Obtener la vendedora asociada al prospecto o al seguimiento
 const vendedoraAsignada = await Usuario.findByPk(cedula_vendedora);
 if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
