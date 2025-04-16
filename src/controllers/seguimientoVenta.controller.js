@@ -194,8 +194,8 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
   const registrarResultadoSeguimiento = async (req, res) => {
     try {
       const { id_seguimiento } = req.params;
-      const { resultado, nota, estado } = req.body; // `estado` es un string, como "ganado"
-
+      const { resultado, nota, estado, monto_cierre } = req.body;
+  
       const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento, {
         include: [
           {
@@ -205,56 +205,56 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
           },
         ],
       });
-
+  
       if (!seguimiento || seguimiento.eliminado === 1) {
         return res.status(404).json({ message: "Seguimiento no encontrado" });
       }
-      
-
-      // Marcar seguimiento como realizado
+  
       seguimiento.resultado = resultado;
       seguimiento.nota = nota;
       seguimiento.estado = "realizado";
       await seguimiento.save();
-
+  
       const venta = seguimiento.venta;
       const prospecto = venta.prospecto;
-
-      // Buscar ID del nuevo estado (por nombre)
+  
       const nuevoEstado = await EstadoProspecto.findOne({ where: { nombre: estado } });
       if (!nuevoEstado) {
         return res.status(400).json({ message: `El estado '${estado}' no está registrado.` });
       }
-
-      // Si el estado es cierre, cerrar la venta
-      if (["ganado", "perdido"].includes(estado)) {
+  
+      // 🔥 Aquí validamos si es ganado y se requiere monto
+      if (estado === "ganado") {
+        if (!monto_cierre) {
+          return res.status(400).json({ message: "Debes enviar el monto de cierre para una venta ganada." });
+        }
+  
+        venta.abierta = 0;
+        venta.fecha_cierre = new Date();
+        venta.monto_cierre = monto_cierre;
+        await venta.save();
+      } else if (estado === "perdido") {
         venta.abierta = 0;
         venta.fecha_cierre = new Date();
         await venta.save();
-
-        // ¿Hay otra venta abierta?
-        const otraAbierta = await VentaProspecto.findOne({
-          where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
-        });
-
-        // Si hay otra venta abierta, el prospecto queda como "interesado"
-        if (otraAbierta) {
-          const estadoInteresado = await EstadoProspecto.findOne({ where: { nombre: "interesado" } });
-          if (!estadoInteresado) {
-            return res.status(400).json({ message: "Estado 'interesado' no está registrado." });
-          }
-          prospecto.id_estado = estadoInteresado.id_estado;
-        } else {
-          // Si no, se asigna el estado real de cierre
-          prospecto.id_estado = nuevoEstado.id_estado;
+      }
+  
+      const otraAbierta = await VentaProspecto.findOne({
+        where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
+      });
+  
+      if (otraAbierta) {
+        const estadoInteresado = await EstadoProspecto.findOne({ where: { nombre: "interesado" } });
+        if (!estadoInteresado) {
+          return res.status(400).json({ message: "Estado 'interesado' no está registrado." });
         }
+        prospecto.id_estado = estadoInteresado.id_estado;
       } else {
-        // Si no es cierre, simplemente actualizamos el estado
         prospecto.id_estado = nuevoEstado.id_estado;
       }
-
+  
       await prospecto.save();
-
+  
       res.json({
         message: "Seguimiento actualizado correctamente",
         seguimiento,
@@ -266,6 +266,7 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
       res.status(500).json({ message: "Error al actualizar seguimiento", error });
     }
   };
+  
 
 /*// Eliminar un seguimiento
 const eliminarSeguimiento = async (req, res) => {

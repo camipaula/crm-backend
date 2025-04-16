@@ -47,6 +47,7 @@ const obtenerProspectos = async (req, res) => {
         {
           model: VentaProspecto,
           as: "ventas",
+          attributes: ["id_venta", "monto_cierre", "abierta"],
           where: { eliminado: 0 },
           required: false,
           include: [{
@@ -56,6 +57,7 @@ const obtenerProspectos = async (req, res) => {
             required: false
           }]
         }
+
 
       ],
     });
@@ -534,15 +536,39 @@ const exportarProspectos = async (req, res) => {
       { header: "Origen", key: "origen", width: 20 },
       { header: "Última Nota", key: "ultima_nota", width: 40 },
       { header: "Próximo Contacto", key: "proximo_contacto", width: 20 },
+      { header: "Fecha de Creación", key: "fecha_creacion", width: 20 },
+      { header: "Monto de Cierre", key: "monto_cierre", width: 20 },
+      { header: "Fecha de Cierre", key: "fecha_cierre", width: 20 },
+
     ];
 
     prospectos.forEach((p) => {
+
+      const ventaPrincipal = p.ventas?.[0];
+
       const ultimaNota = p.ventas?.[0]?.seguimientos?.[0]?.nota ?? "Sin nota";
       const proximoContacto = p.ventas
         ?.flatMap((venta) => venta.seguimientos || [])
         .filter((s) => s.estado === "pendiente")
         .sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada))[0]
         ?.fecha_programada;
+
+      const fechaProximoContacto = proximoContacto
+        ? new Date(proximoContacto).toLocaleString("es-EC", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true
+        })
+        : "Sin programar";
+
+
+      const fechaCierre = ventaPrincipal?.fecha_cierre
+        ? new Date(ventaPrincipal.fecha_cierre).toLocaleDateString("es-EC")
+        : "No cerrada";
+
 
       sheet.addRow({
         id_prospecto: p.id_prospecto,
@@ -552,11 +578,17 @@ const exportarProspectos = async (req, res) => {
         telefono: p.telefono,
         direccion: p.direccion || "No registrada",
         sector: p.sector || "No registrado",
-        estado: p.estado_prospecto?.nombre || "Sin estado",
+        estado:
+          p.estado_prospecto?.nombre === "ganado" && p.ventas?.[0]?.monto_cierre
+            ? `Ganado ($${p.ventas[0].monto_cierre})`
+            : p.estado_prospecto?.nombre || "Sin estado",
         vendedora: p.vendedora_prospecto?.nombre || "No asignada",
         origen: p.origen_prospecto?.descripcion || "Desconocido",
         ultima_nota: ultimaNota,
-        proximo_contacto: proximoContacto ? new Date(proximoContacto).toLocaleDateString("es-EC") : "Sin programar",
+        proximo_contacto: fechaProximoContacto,
+        fecha_creacion: new Date(p.created_at).toLocaleDateString("es-EC", { timeZone: "UTC" }),
+        monto_cierre: p.ventas?.[0]?.monto_cierre ?? "No cerrado",
+        fecha_cierre: fechaCierre,
       });
     });
 

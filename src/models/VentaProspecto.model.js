@@ -25,11 +25,20 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
         type: DataTypes.TINYINT,
         allowNull: false,
         defaultValue: 1,  // 1 = abierta, 0 = cerrada
-    },
+    },    
     fecha_cierre: {
         type: DataTypes.DATE,
         allowNull: true,
     },
+    monto_cierre: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        get() {
+          const rawValue = this.getDataValue("monto_cierre");
+          return rawValue !== null ? parseFloat(rawValue) : null;
+        },
+      },
+       
     eliminado: {
         type: DataTypes.TINYINT,
         defaultValue: 0

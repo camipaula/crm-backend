@@ -63,6 +63,8 @@
           id_prospecto,
           eliminado: 0 
         },
+        attributes: ["id_venta", "objetivo", "abierta", "fecha_cierre", "monto_cierre"], 
+
         include: [
           {
             model: Prospecto,

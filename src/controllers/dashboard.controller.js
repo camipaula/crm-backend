@@ -65,13 +65,22 @@ const obtenerDashboard = async (req, res) => {
         prospecto: v.prospecto.nombre,
         fecha_apertura: creada,
         fecha_cierre: cerrada,
-        dias
+        dias,
+        monto: v.monto_cierre || 0,
       };
     });
 
     const promedioDiasCierre = tablaCierres.length > 0
       ? Math.round(tablaCierres.reduce((sum, r) => sum + r.dias, 0) / tablaCierres.length)
       : 0;
+
+      const promedioMontoCierre = tablaCierres.length > 0
+  ? Math.round(tablaCierres.reduce((sum, r) => sum + (r.monto || 0), 0) / tablaCierres.length)
+  : 0;
+
+
+  const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
+
 
     const graficoVentas = [
       { estado: "Abiertas", cantidad: totalVentas - ventasCerradas.length },
@@ -110,18 +119,25 @@ const obtenerDashboard = async (req, res) => {
       ? (totalInteresados / estadosProspectos.length) * 100
       : 0;
 
-    return res.json({
-      porcentajeCerradas,
-      tablaCierres,
-      promedioDiasCierre,
-      graficoVentas,
-      graficoEstadosProspecto,
-      interes: {
-        total: totalInteresados,
-        porcentaje: porcentajeInteres,
-        cerrados: cerradosDesdeInteres.length
-      }
-    });
+      return res.json({
+        totalVentas,
+        totalVentasAbiertas,
+        totalVentasCerradas: ventasCerradas.length,
+        porcentajeCerradas,
+        promedioDiasCierre,
+        promedioMontoCierre,
+        tablaCierres,
+        graficoVentas,
+        graficoEstadosProspecto,
+        interes: {
+          total: totalInteresados,
+          porcentaje: porcentajeInteres,
+          cerrados: cerradosDesdeInteres.length
+        }
+      });
+      
+      
+      
   } catch (error) {
     console.error(" Error en dashboard:", error);
     return res.status(500).json({ message: "Error obteniendo dashboard", error: error.message });
