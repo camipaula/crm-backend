@@ -240,8 +240,13 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
       }
   
       const otraAbierta = await VentaProspecto.findOne({
-        where: { id_prospecto: prospecto.id_prospecto, abierta: 1 },
+        where: {
+          id_prospecto: prospecto.id_prospecto,
+          abierta: 1,
+          id_venta: { [Op.ne]: venta.id_venta }  
+        },
       });
+      
   
       if (otraAbierta) {
         const estadoInteresado = await EstadoProspecto.findOne({ where: { nombre: "interesado" } });
