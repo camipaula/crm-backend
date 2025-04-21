@@ -63,5 +63,7 @@ router.put("/:id_prospecto", upload.single("archivo"), actualizarProspecto);
 router.delete("/:id_prospecto", verificarToken, eliminarProspecto);
 
 
+router.put("/:id_prospecto/eliminar", verificarToken, eliminarProspecto);
+
 
 module.exports = router;

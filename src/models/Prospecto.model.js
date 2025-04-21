@@ -96,7 +96,12 @@
         eliminado: {
             type: DataTypes.TINYINT,
             defaultValue: 0
-          }          
+          },
+        razon_eliminacion: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+          }
+                
     }, {
         tableName: "prospecto",
         timestamps: true,  

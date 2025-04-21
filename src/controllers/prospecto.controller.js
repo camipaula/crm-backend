@@ -276,8 +276,25 @@ const crearProspecto = async (req, res) => {
       eliminado: 0,
     });
 
-    res.status(201).json({ message: "Prospecto creado exitosamente", prospecto: nuevoProspecto });
-  } catch (error) {
+    // Crear automáticamente una prospección (venta) con objetivo
+    if (!req.body.objetivo || req.body.objetivo.trim().length < 2) {
+      return res.status(400).json({ message: "Debes proporcionar un objetivo válido para la prospección." });
+    }
+
+    const nuevaVenta = await VentaProspecto.create({
+      id_prospecto: nuevoProspecto.id_prospecto,
+      objetivo: req.body.objetivo,
+      abierta: 1,
+      eliminado: 0,
+    });
+
+
+    res.status(201).json({
+      message: "Prospecto y prospección creados exitosamente",
+      prospecto: nuevoProspecto,
+      venta: nuevaVenta
+    });
+      } catch (error) {
     console.error("Error en crearProspecto:", error);
     res.status(500).json({ message: "Error al crear prospecto", error });
   }
@@ -343,6 +360,11 @@ const actualizarProspecto = async (req, res) => {
 const eliminarProspecto = async (req, res) => {
   try {
     const { id_prospecto } = req.params;
+    const { razon } = req.body; // viene del frontend
+
+    if (!razon || razon.trim().length < 3) {
+      return res.status(400).json({ message: "Debe proporcionar una razón válida para eliminar el prospecto." });
+    }
 
     const prospecto = await Prospecto.findByPk(id_prospecto, {
       include: {
@@ -359,8 +381,16 @@ const eliminarProspecto = async (req, res) => {
       return res.status(404).json({ message: "Prospecto no encontrado o ya fue eliminado" });
     }
 
-    // Marcar prospecto como eliminado
+    // Solo permitir eliminar si el prospecto está en estado 'nuevo'
+    const estado = await EstadoProspecto.findByPk(prospecto.id_estado);
+    if (!estado || (estado.nombre && estado.nombre.toLowerCase()) !== "nuevo") {
+      return res.status(400).json({ message: "Solo se puede eliminar prospectos en estado 'nuevo'." });
+    }
+
+
+    // Marcar prospecto como eliminado y guardar razón
     prospecto.eliminado = 1;
+    prospecto.razon_eliminacion = razon;
     await prospecto.save();
 
     // Marcar ventas y seguimientos como eliminados
@@ -374,13 +404,12 @@ const eliminarProspecto = async (req, res) => {
       }
     }
 
-    res.json({ message: "Prospecto y ventas eliminadas lógicamente" });
+    res.json({ message: "Prospecto eliminado lógicamente con razón registrada." });
   } catch (error) {
     console.error("Error al eliminar prospecto:", error);
     res.status(500).json({ message: "Error al eliminar prospecto", error });
   }
 };
-
 
 
 /*// Eliminar un prospecto de la base de datos 
