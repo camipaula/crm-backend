@@ -11,11 +11,13 @@ const EstadoProspecto = require("../models/EstadoProspecto.model");
 // Obtener prospectos con filtros
 const obtenerProspectos = async (req, res) => {
   try {
-    const { cedula_ruc, rol } = req.usuario; // Cedula del usuario logueado
-    const { cedula_vendedora, estado, fechaInicio, fechaFin, sector, id_categoria, ciudad, provincia } = req.query;
+    const { cedula_ruc, rol } = req.usuario;
+    const {
+      cedula_vendedora, estado, fechaInicio, fechaFin, sector, id_categoria,
+      ciudad, provincia, page = 1, limit = 20
+    } = req.query;
 
-    const whereClause = {};
-    whereClause.eliminado = 0;
+    const whereClause = { eliminado: 0 };
 
     // Si el usuario es una vendedora, solo obtiene sus prospectos
     if (rol === "vendedora") {
@@ -36,8 +38,9 @@ const obtenerProspectos = async (req, res) => {
     if (ciudad) whereClause.ciudad = ciudad;
     if (provincia) whereClause.provincia = provincia;
 
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const prospectos = await Prospecto.findAll({
+    const { count, rows } = await Prospecto.findAndCountAll({
       where: whereClause,
       include: [
         { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
@@ -57,12 +60,20 @@ const obtenerProspectos = async (req, res) => {
             required: false
           }]
         }
-
-
       ],
+
+    limit: parseInt(limit),
+      offset,
+      order: [["created_at", "DESC"]]
     });
 
-    res.json(prospectos);
+    res.json({
+      total: count,
+      page: parseInt(page),
+      totalPages: Math.ceil(count / limit),
+      prospectos: rows
+    });
+
   } catch (error) {
     console.error("Error al obtener prospectos:", error);
     res.status(500).json({ message: "Error al obtener prospectos", error });
@@ -277,7 +288,7 @@ const crearProspecto = async (req, res) => {
     });
 
     // Crear automáticamente una prospección (venta) con objetivo
-    if (!req.body.objetivo || req.body.objetivo.trim().length < 2) {
+    if (!req.body.objetivo || req.body.objetivo.trim().length < 1) {
       return res.status(400).json({ message: "Debes proporcionar un objetivo válido para la prospección." });
     }
 

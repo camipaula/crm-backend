@@ -67,6 +67,33 @@ const actualizarVendedora = async (req, res) => {
   }
 };
 
+const actualizarPerfilAdmin = async (req, res) => {
+  try {
+    const cedula_ruc = req.usuario.cedula_ruc;
+    const { email, password } = req.body;
+
+    const admin = await Usuario.findByPk(cedula_ruc);
+
+    if (!admin || admin.rol !== "admin") {
+      return res.status(403).json({ message: "Acceso denegado" });
+    }
+
+    if (email) admin.email = email;
+
+    if (password && password.trim() !== "") {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      admin.password = hashedPassword;
+    }
+
+    await admin.save();
+    res.json({ message: "Perfil actualizado correctamente" });
+  } catch (error) {
+    console.error("Error al actualizar perfil:", error);
+    res.status(500).json({ message: "Error al actualizar perfil", error });
+  }
+};
+
 
 //eliminar vendedora
 const eliminarVendedora = async (req, res) => {
@@ -119,9 +146,29 @@ const cambiarEstadoVendedora = async (req, res) => {
   }
 };
 
+// controlador
+const obtenerPerfilAdmin = async (req, res) => {
+  try {
+    const cedula_ruc = req.usuario.cedula_ruc; // del middleware de autenticación
+    const admin = await Usuario.findByPk(cedula_ruc, {
+      attributes: ["cedula_ruc", "nombre", "email", "rol"]
+    });
+
+    if (!admin || admin.rol !== "admin") {
+      return res.status(403).json({ message: "Acceso denegado" });
+    }
+
+    res.json(admin);
+  } catch (error) {
+    console.error("Error al obtener perfil:", error);
+    res.status(500).json({ message: "Error al obtener perfil" });
+  }
+};
 
 
 
-module.exports = { obtenerVendedoras, obtenerVendedoraPorCedula, actualizarVendedora, eliminarVendedora, cambiarEstadoVendedora};
+
+
+module.exports = { obtenerVendedoras, obtenerVendedoraPorCedula, actualizarVendedora,actualizarPerfilAdmin, eliminarVendedora, cambiarEstadoVendedora, obtenerPerfilAdmin};
 
 

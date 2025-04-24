@@ -55,9 +55,24 @@ const obtenerDashboard = async (req, res) => {
     const totalVentas = ventas.length;
     const ventasCerradas = ventas.filter(v => v.abierta === 0);
 
+    const ventasGanadas = ventasCerradas.filter(v => 
+      v.prospecto.estado_prospecto?.nombre === "ganado"
+    );
+    const ventasPerdidas = ventasCerradas.filter(v => v.prospecto.estado_prospecto?.nombre === "perdido");
+
+    const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
+
+    const porcentajeGanadas = totalVentas > 0
+    ? (ventasGanadas.length / totalVentas) * 100
+    : 0;
+
+    const porcentajePerdidas = totalVentas > 0
+  ? (ventasPerdidas.length / totalVentas) * 100
+  : 0;
+
     const porcentajeCerradas = totalVentas > 0 ? (ventasCerradas.length / totalVentas) * 100 : 0;
 
-    const tablaCierres = ventasCerradas.map(v => {
+    const tablaCierres = ventasGanadas.map(v => {
       const creada = new Date(v.created_at);
       const cerrada = v.fecha_cierre ? new Date(v.fecha_cierre) : null;
       const dias = cerrada ? Math.ceil((cerrada - creada) / (1000 * 60 * 60 * 24)) : 0;
@@ -70,22 +85,24 @@ const obtenerDashboard = async (req, res) => {
       };
     });
 
+
+    
     const promedioDiasCierre = tablaCierres.length > 0
       ? Math.round(tablaCierres.reduce((sum, r) => sum + r.dias, 0) / tablaCierres.length)
       : 0;
 
-      const promedioMontoCierre = tablaCierres.length > 0
-  ? Math.round(tablaCierres.reduce((sum, r) => sum + (r.monto || 0), 0) / tablaCierres.length)
-  : 0;
+    const promedioMontoCierre = tablaCierres.length > 0
+      ? Math.round(tablaCierres.reduce((sum, r) => sum + (r.monto || 0), 0) / tablaCierres.length)
+      : 0;
 
 
-  const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
 
 
-    const graficoVentas = [
-      { estado: "Abiertas", cantidad: totalVentas - ventasCerradas.length },
-      { estado: "Cerradas", cantidad: ventasCerradas.length }
-    ];
+      const graficoVentas = [
+        { estado: "Abiertas", cantidad: totalVentasAbiertas },
+        { estado: "Ganadas", cantidad: ventasGanadas.length },
+        { estado: "Perdidas", cantidad: ventasPerdidas.length }
+      ];
 
     // Todos los prospectos para graficar estados
     const estadosProspectos = await Prospecto.findAll({
@@ -122,8 +139,12 @@ const obtenerDashboard = async (req, res) => {
       return res.json({
         totalVentas,
         totalVentasAbiertas,
+        totalVentasGanadas: ventasGanadas.length,
+  totalVentasPerdidas: ventasPerdidas.length,
         totalVentasCerradas: ventasCerradas.length,
-        porcentajeCerradas,
+        porcentajeGanadas,
+        porcentajePerdidas,
+
         promedioDiasCierre,
         promedioMontoCierre,
         tablaCierres,
@@ -132,7 +153,9 @@ const obtenerDashboard = async (req, res) => {
         interes: {
           total: totalInteresados,
           porcentaje: porcentajeInteres,
-          cerrados: cerradosDesdeInteres.length
+          cerrados: ventasGanadas.filter(v =>
+            estadosInteres.includes(v.prospecto.estado_prospecto?.nombre)
+          ).length
         }
       });
       

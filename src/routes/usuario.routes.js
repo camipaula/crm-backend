@@ -3,9 +3,13 @@ const {
     obtenerVendedoras,
     obtenerVendedoraPorCedula, 
     actualizarVendedora, 
+    actualizarPerfilAdmin,
     eliminarVendedora, 
     cambiarEstadoVendedora,
+    obtenerPerfilAdmin,
 } = require("../controllers/usuario.controller");
+
+const verificarToken = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
@@ -23,5 +27,9 @@ router.patch("/vendedoras/:cedula_ruc/inactivar", cambiarEstadoVendedora);
 
 // Ruta para eliminar Vendedora
 router.delete("/vendedoras/:cedula_ruc", eliminarVendedora);
+
+router.get("/mi-perfil", verificarToken, obtenerPerfilAdmin);
+router.put("/mi-perfil", verificarToken, actualizarPerfilAdmin);
+
 
 module.exports = router;

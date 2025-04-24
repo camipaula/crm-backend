@@ -6,6 +6,7 @@ const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model"); 
 const { Op } = require("sequelize");
 const ExcelJS = require("exceljs");
+const { enviarCorreoCierre } = require("../utils/correoUtils");
 
 function parseLocalDatetime(datetimeStr) {
   const [datePart, timePart] = datetimeStr.split("T");
@@ -223,20 +224,33 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
         return res.status(400).json({ message: `El estado '${estado}' no está registrado.` });
       }
   
-      // 🔥 Aquí validamos si es ganado y se requiere monto
+      //Aquí validamos si es ganado y se requiere monto
       if (estado === "ganado") {
         if (!monto_cierre) {
           return res.status(400).json({ message: "Debes enviar el monto de cierre para una venta ganada." });
         }
-  
         venta.abierta = 0;
         venta.fecha_cierre = new Date();
         venta.monto_cierre = monto_cierre;
         await venta.save();
+
+        await enviarCorreoCierre({
+          prospecto,
+          estado: "ganado",
+          monto: monto_cierre
+        });
+
       } else if (estado === "perdido") {
         venta.abierta = 0;
         venta.fecha_cierre = new Date();
         await venta.save();
+        
+        await enviarCorreoCierre({
+          prospecto,
+          estado: "perdido",
+          monto: 0
+        });
+        
       }
   
       const otraAbierta = await VentaProspecto.findOne({
