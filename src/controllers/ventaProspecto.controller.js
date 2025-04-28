@@ -325,32 +325,49 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
       rows = rows.filter((venta) => {
         const seguimientos = venta.seguimientos || [];
         if (seguimientos.length === 0) return seguimiento === "sin_seguimiento";
-
-        const ultimo = seguimientos[0];
-        const fechaProgramada = new Date(ultimo.fecha_programada);
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-        const fechaDia = new Date(fechaProgramada);
-        fechaDia.setHours(0, 0, 0, 0);
-
-        const diffDias = (fechaDia - hoy) / (1000 * 60 * 60 * 24);
-
-        switch (seguimiento) {
-          case "vencido":
-            return diffDias < 0;
-          case "hoy":
-            return diffDias === 0;
-          case "proximo":
-            return diffDias > 0 && diffDias <= 7;
-          case "futuro":
-            return diffDias > 7;
-          case "realizado":
-            return ultimo.estado === "realizado";
-          default:
-            return true;
+    
+        // 🔥 Buscar el pendiente más próximo
+        const pendientes = seguimientos
+          .filter(s => s.estado === "pendiente")
+          .sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada));
+    
+        if (pendientes.length > 0) {
+          const siguientePendiente = pendientes[0];
+          const fechaProgramada = new Date(siguientePendiente.fecha_programada);
+          const hoy = new Date();
+          hoy.setHours(0, 0, 0, 0);
+          fechaProgramada.setHours(0, 0, 0, 0);
+    
+          const diffDias = (fechaProgramada - hoy) / (1000 * 60 * 60 * 24);
+    
+          switch (seguimiento) {
+            case "vencido":
+              return diffDias < 0;
+            case "hoy":
+              return diffDias === 0;
+            case "proximo":
+              return diffDias > 0 && diffDias <= 7;
+            case "futuro":
+              return diffDias > 7;
+            default:
+              return false;
+          }
         }
+    
+        // 🔥 Si no hay pendientes, buscar el último realizado
+        const realizados = seguimientos
+          .filter(s => s.estado === "realizado")
+          .sort((a, b) => new Date(b.fecha_programada) - new Date(a.fecha_programada));
+    
+        if (realizados.length > 0) {
+          return seguimiento === "realizado";
+        }
+    
+        // 🔥 Si no hay nada, es sin seguimiento
+        return seguimiento === "sin_seguimiento";
       });
     }
+    
 
     // 🔥 Siempre después del filtro calcula paginación
     const total = rows.length;
