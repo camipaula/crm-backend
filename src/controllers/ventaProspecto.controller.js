@@ -282,25 +282,20 @@ const eliminarVenta = async (req, res) => {
 
 const obtenerProspeccionesAgrupadas = async (req, res) => {
   try {
-    const { cedula_vendedora, estado_prospeccion, page = 1, limit = 10 } = req.query;
+    const { cedula_vendedora, estado_prospeccion, page = 1, limit = 10, seguimiento } = req.query;
 
     const whereVenta = { eliminado: 0 };
     if (estado_prospeccion === "abiertas") whereVenta.abierta = 1;
     if (estado_prospeccion === "cerradas") whereVenta.abierta = 0;
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    // 👉 aquí validamos bien el filtro por cedula
     const prospectoWhere = {};
     if (cedula_vendedora && cedula_vendedora !== "undefined") {
       prospectoWhere.cedula_vendedora = cedula_vendedora;
     }
 
-    const { count, rows } = await VentaProspecto.findAndCountAll({
+    let rows = await VentaProspecto.findAll({
       subQuery: false,
       where: whereVenta,
-      limit: parseInt(limit),
-      offset,
       order: [["created_at", "DESC"]],
       include: [
         {
@@ -309,42 +304,71 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
           attributes: ["id_prospecto", "nombre", "cedula_vendedora"],
           where: Object.keys(prospectoWhere).length ? prospectoWhere : undefined,
           include: [
-            {
-              model: EstadoProspecto,
-              as: "estado_prospecto",
-              attributes: ["nombre"],
-            },
-            {
-              model: Usuario,
-              as: "vendedora_prospecto",
-              attributes: ["nombre", "estado"],
-            }
+            { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
+            { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre", "estado"] }
           ],
         },
-
         {
           model: SeguimientoVenta,
           as: "seguimientos",
-          include: [
-            { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] },
-          ],
+          where: { eliminado: 0 },
           required: false,
-          order: [["fecha_programada", "DESC"]],
+          include: [
+            { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] }
+          ],
         },
       ],
     });
 
+    // 🔥 Si hay filtro de seguimiento, filtras en memoria
+    if (seguimiento && seguimiento !== "todos") {
+      rows = rows.filter((venta) => {
+        const seguimientos = venta.seguimientos || [];
+        if (seguimientos.length === 0) return seguimiento === "sin_seguimiento";
+
+        const ultimo = seguimientos[0];
+        const fechaProgramada = new Date(ultimo.fecha_programada);
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const fechaDia = new Date(fechaProgramada);
+        fechaDia.setHours(0, 0, 0, 0);
+
+        const diffDias = (fechaDia - hoy) / (1000 * 60 * 60 * 24);
+
+        switch (seguimiento) {
+          case "vencido":
+            return diffDias < 0;
+          case "hoy":
+            return diffDias === 0;
+          case "proximo":
+            return diffDias > 0 && diffDias <= 7;
+          case "futuro":
+            return diffDias > 7;
+          case "realizado":
+            return ultimo.estado === "realizado";
+          default:
+            return true;
+        }
+      });
+    }
+
+    // 🔥 Siempre después del filtro calcula paginación
+    const total = rows.length;
+    const paginados = rows.slice((page - 1) * limit, page * limit);
+
     res.json({
-      total: count,
-      totalPages: Math.ceil(count / limit),
+      total,
+      totalPages: Math.ceil(total / limit),
       page: parseInt(page),
-      prospecciones: rows
+      prospecciones: paginados
     });
+
   } catch (error) {
-    console.error(" Error al obtener prospecciones agrupadas:", error);
+    console.error("Error al obtener prospecciones agrupadas:", error);
     res.status(500).json({ message: "Error al obtener prospecciones", error });
   }
 };
+
 
 
 module.exports = {
