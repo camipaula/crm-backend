@@ -37,6 +37,10 @@ const obtenerProspectos = async (req, res) => {
     }
     if (ciudad) whereClause.ciudad = ciudad;
     if (provincia) whereClause.provincia = provincia;
+    if (req.query.nombre) {
+      whereClause.nombre = { [Op.like]: `%${req.query.nombre}%` };
+    }
+    
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
