@@ -66,18 +66,18 @@ const obtenerProspectos = async (req, res) => {
         }
       ]
     });
-    
+
     // Ordenar solo si se pidió por próximo contacto
     if (req.query.orden === "proximo_contacto") {
       todosLosProspectos.sort((a, b) => {
         const fechaA = a.ventas?.flatMap(v => v.seguimientos || [])
           .filter(s => s.estado === "pendiente")
           .sort((s1, s2) => new Date(s1.fecha_programada) - new Date(s2.fecha_programada))[0]?.fecha_programada;
-    
+
         const fechaB = b.ventas?.flatMap(v => v.seguimientos || [])
           .filter(s => s.estado === "pendiente")
           .sort((s1, s2) => new Date(s1.fecha_programada) - new Date(s2.fecha_programada))[0]?.fecha_programada;
-    
+
         if (!fechaA && !fechaB) return 0;
         if (!fechaA) return 1;
         if (!fechaB) return -1;
@@ -87,11 +87,11 @@ const obtenerProspectos = async (req, res) => {
       // Por defecto ordenar por fecha de creación DESC
       todosLosProspectos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
-    
+
     // Paginado manual
     const total = todosLosProspectos.length;
     const prospectosPagina = todosLosProspectos.slice(offset, offset + parseInt(limit));
-    
+
     res.json({
       total,
       page: parseInt(page),
@@ -266,8 +266,12 @@ const crearProspecto = async (req, res) => {
     // Fecha
     const fechaCreacion = created_at ? new Date(created_at) : new Date();
 
-    // Validar duplicado por cédula
-    if (cedula_ruc) {
+    // Buscar si el origen es "Aumento de Portafolio"
+    const origenAumento = await OrigenProspecto.findByPk(id_origen);
+    const esAumentoPortafolio = origenAumento?.descripcion?.toLowerCase() === "aumento de portafolio";
+
+    // Validar duplicado por cédula solo si NO es "Aumento de Portafolio"
+    if (!esAumentoPortafolio && cedula_ruc) {
       const existente = await Prospecto.findOne({
         where: { cedula_ruc, eliminado: 0 }
       });
@@ -276,14 +280,17 @@ const crearProspecto = async (req, res) => {
       }
     }
 
-
-    // Validar duplicado por nombre
-    const duplicado = await Prospecto.findOne({
-      where: { nombre, eliminado: 0 }
-    });
-    if (duplicado) {
-      return res.status(400).json({ message: "Ya existe un prospecto con ese nombre." });
+    // Validar duplicado por nombre solo si NO es "Aumento de Portafolio"
+    if (!esAumentoPortafolio) {
+      const duplicado = await Prospecto.findOne({
+        where: { nombre, eliminado: 0 }
+      });
+      if (duplicado) {
+        return res.status(400).json({ message: "Ya existe un prospecto con ese nombre." });
+      }
     }
+
+
 
     // Obtener estado "nuevo"
     const estadoNuevo = await EstadoProspecto.findOne({ where: { nombre: "nuevo" } });
