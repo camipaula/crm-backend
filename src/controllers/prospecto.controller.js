@@ -40,11 +40,11 @@ const obtenerProspectos = async (req, res) => {
     if (req.query.nombre) {
       whereClause.nombre = { [Op.like]: `%${req.query.nombre}%` };
     }
-    
+
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const { count, rows } = await Prospecto.findAndCountAll({
+    const todosLosProspectos = await Prospecto.findAll({
       where: whereClause,
       include: [
         { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
@@ -64,19 +64,41 @@ const obtenerProspectos = async (req, res) => {
             required: false
           }]
         }
-      ],
-
-    limit: parseInt(limit),
-      offset,
-      order: [["created_at", "DESC"]]
+      ]
     });
-
+    
+    // Ordenar solo si se pidió por próximo contacto
+    if (req.query.orden === "proximo_contacto") {
+      todosLosProspectos.sort((a, b) => {
+        const fechaA = a.ventas?.flatMap(v => v.seguimientos || [])
+          .filter(s => s.estado === "pendiente")
+          .sort((s1, s2) => new Date(s1.fecha_programada) - new Date(s2.fecha_programada))[0]?.fecha_programada;
+    
+        const fechaB = b.ventas?.flatMap(v => v.seguimientos || [])
+          .filter(s => s.estado === "pendiente")
+          .sort((s1, s2) => new Date(s1.fecha_programada) - new Date(s2.fecha_programada))[0]?.fecha_programada;
+    
+        if (!fechaA && !fechaB) return 0;
+        if (!fechaA) return 1;
+        if (!fechaB) return -1;
+        return new Date(fechaA) - new Date(fechaB);
+      });
+    } else {
+      // Por defecto ordenar por fecha de creación DESC
+      todosLosProspectos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+    
+    // Paginado manual
+    const total = todosLosProspectos.length;
+    const prospectosPagina = todosLosProspectos.slice(offset, offset + parseInt(limit));
+    
     res.json({
-      total: count,
+      total,
       page: parseInt(page),
-      totalPages: Math.ceil(count / limit),
-      prospectos: rows
+      totalPages: Math.ceil(total / limit),
+      prospectos: prospectosPagina
     });
+
 
   } catch (error) {
     console.error("Error al obtener prospectos:", error);
@@ -309,7 +331,7 @@ const crearProspecto = async (req, res) => {
       prospecto: nuevoProspecto,
       venta: nuevaVenta
     });
-      } catch (error) {
+  } catch (error) {
     console.error("Error en crearProspecto:", error);
     res.status(500).json({ message: "Error al crear prospecto", error });
   }
@@ -330,7 +352,7 @@ const actualizarProspecto = async (req, res) => {
       return res.status(404).json({ message: "Prospecto no encontrado" });
     }
 
-    // 🟨 Validar que la vendedora asignada esté activa
+    // Validar que la vendedora asignada esté activa
     const vendedoraAsignada = cedula_vendedora === "" ? null : cedula_vendedora;
     if (vendedoraAsignada) {
       const vendedora = await Usuario.findByPk(vendedoraAsignada);
