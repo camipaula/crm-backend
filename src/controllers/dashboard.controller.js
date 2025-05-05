@@ -118,23 +118,12 @@ const obtenerDashboard = async (req, res) => {
       resumenEstados[estado] = (resumenEstados[estado] || 0) + 1;
     });
 
-    const graficoEstadosProspecto = Object.entries(resumenEstados).map(([estado, cantidad]) => ({
-      estado,
-      cantidad
-    }));
-
-    const prospectosConInteres = estadosProspectos.filter(p =>
-      estadosInteres.includes(p.estado_prospecto?.nombre)
-    );
-
-    const cerradosDesdeInteres = ventasCerradas.filter(v =>
-      estadosInteres.includes(v.prospecto.estado_prospecto?.nombre)
-    );
-
-    const totalInteresados = prospectosConInteres.length;
-    const porcentajeInteres = estadosProspectos.length > 0
-      ? (totalInteresados / estadosProspectos.length) * 100
-      : 0;
+    const totalProspectos = estadosProspectos.length;
+const graficoEstadosProspecto = Object.entries(resumenEstados).map(([estado, cantidad]) => ({
+  estado,
+  cantidad,
+  porcentaje: totalProspectos > 0 ? ((cantidad / totalProspectos) * 100).toFixed(2) : 0
+}));
 
       return res.json({
         totalVentas,
@@ -150,13 +139,6 @@ const obtenerDashboard = async (req, res) => {
         tablaCierres,
         graficoVentas,
         graficoEstadosProspecto,
-        interes: {
-          total: totalInteresados,
-          porcentaje: porcentajeInteres,
-          cerrados: ventasGanadas.filter(v =>
-            estadosInteres.includes(v.prospecto.estado_prospecto?.nombre)
-          ).length
-        }
       });
       
       
