@@ -652,7 +652,7 @@ const exportarProspectos = async (req, res) => {
         direccion: p.direccion || "No registrada",
         sector: p.sector || "No registrado",
         estado:
-          p.estado_prospecto?.nombre === "ganado" && p.ventas?.[0]?.monto_cierre
+          p.estado_prospecto?.nombre === "Cierre" && p.ventas?.[0]?.monto_cierre
             ? `Ganado ($${p.ventas[0].monto_cierre})`
             : p.estado_prospecto?.nombre || "Sin estado",
         vendedora: p.vendedora_prospecto?.nombre || "No asignada",

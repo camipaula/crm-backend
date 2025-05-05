@@ -196,7 +196,7 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
     try {
       const { id_seguimiento } = req.params;
       const { resultado, nota, estado, monto_cierre } = req.body;
-  
+
       const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento, {
         include: [
           {
@@ -224,8 +224,8 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
         return res.status(400).json({ message: `El estado '${estado}' no está registrado.` });
       }
   
-      //Aquí validamos si es ganado y se requiere monto
-      if (estado === "ganado") {
+      //Aquí validamos si es Cierre(Ganado) y se requiere monto
+      if (estado === "Cierre") {
         if (!monto_cierre) {
           return res.status(400).json({ message: "Debes enviar el monto de cierre para una venta ganada." });
         }
@@ -236,18 +236,18 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
 
         await enviarCorreoCierre({
           prospecto,
-          estado: "ganado",
+          estado: "Cierre",
           monto: monto_cierre
         });
 
-      } else if (estado === "perdido") {
+      } else if (estado === "Competencia") {
         venta.abierta = 0;
         venta.fecha_cierre = new Date();
         await venta.save();
         
         await enviarCorreoCierre({
           prospecto,
-          estado: "perdido",
+          estado: "Competencia",
           monto: 0
         });
         
@@ -263,11 +263,11 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
       
   
       if (otraAbierta) {
-        const estadoInteresado = await EstadoProspecto.findOne({ where: { nombre: "interesado" } });
-        if (!estadoInteresado) {
-          return res.status(400).json({ message: "Estado 'interesado' no está registrado." });
+        const estadoPlaneacion = await EstadoProspecto.findOne({ where: { nombre: "En Planeación" } });
+        if (!estadoPlaneacion) {
+          return res.status(400).json({ message: "Estado 'En Planeación' no está registrado." });
         }
-        prospecto.id_estado = estadoInteresado.id_estado;
+        prospecto.id_estado = estadoPlaneacion.id_estado;
       } else {
         prospecto.id_estado = nuevoEstado.id_estado;
       }

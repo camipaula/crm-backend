@@ -4,7 +4,7 @@ const VentaProspecto = require("../models/VentaProspecto.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model");
 const Usuario = require("../models/Usuario.model");
 
-const estadosInteres = ["interesado", "cita", "proformado", "ensayo"];
+const estadosInteres = ["En Planeación", "En Atracción"];
 
 const obtenerDashboard = async (req, res) => {
   try {
@@ -56,9 +56,9 @@ const obtenerDashboard = async (req, res) => {
     const ventasCerradas = ventas.filter(v => v.abierta === 0);
 
     const ventasGanadas = ventasCerradas.filter(v => 
-      v.prospecto.estado_prospecto?.nombre === "ganado"
+      v.prospecto.estado_prospecto?.nombre === "Cierre"
     );
-    const ventasPerdidas = ventasCerradas.filter(v => v.prospecto.estado_prospecto?.nombre === "perdido");
+    const ventasPerdidas = ventasCerradas.filter(v => v.prospecto.estado_prospecto?.nombre === "Competencia");
 
     const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
 
