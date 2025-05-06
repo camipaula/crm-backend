@@ -328,13 +328,13 @@
         ],
       });
 
-      // 🔥 Si hay filtro de seguimiento, filtras en memoria
+      // Si hay filtro de seguimiento, filtras en memoria
       if (seguimiento && seguimiento !== "todos") {
         rows = rows.filter((venta) => {
           const seguimientos = venta.seguimientos || [];
           if (seguimientos.length === 0) return seguimiento === "sin_seguimiento";
       
-          // 🔥 Buscar el pendiente más próximo
+          // Buscar el pendiente más próximo
           const pendientes = seguimientos
             .filter(s => s.estado === "pendiente")
             .sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada));

@@ -36,6 +36,12 @@ SeguimientoVenta.belongsTo(Usuario, { foreignKey: "cedula_vendedora", as: "vende
 TipoSeguimiento.hasMany(SeguimientoVenta, { foreignKey: "id_tipo", as: "seguimientos_tipo", onDelete: "CASCADE" });
 SeguimientoVenta.belongsTo(TipoSeguimiento, { foreignKey: "id_tipo", as: "tipo_seguimiento" });
 
+
+
+// Relaciones estado y venta 
+//VentaProspecto.belongsTo(Prospecto, { foreignKey: "id_prospecto" });
+//VentaProspecto.belongsTo(EstadoProspecto, { foreignKey: "id_estado" });
+
 // Relación Prospecto - EstadoProspecto (1 a 1)
 EstadoProspecto.hasMany(Prospecto, {
     foreignKey: "id_estado",

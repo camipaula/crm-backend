@@ -196,7 +196,7 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
     try {
       const { id_seguimiento } = req.params;
       const { resultado, nota, estado, monto_cierre } = req.body;
-
+  
       const seguimiento = await SeguimientoVenta.findByPk(id_seguimiento, {
         include: [
           {
@@ -224,7 +224,6 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
         return res.status(400).json({ message: `El estado '${estado}' no está registrado.` });
       }
   
-      //Aquí validamos si es Cierre(Ganado) y se requiere monto
       if (estado === "Cierre") {
         if (!monto_cierre) {
           return res.status(400).json({ message: "Debes enviar el monto de cierre para una venta ganada." });
@@ -233,34 +232,19 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
         venta.fecha_cierre = new Date();
         venta.monto_cierre = monto_cierre;
         await venta.save();
-
-        await enviarCorreoCierre({
-          prospecto,
-          estado: "Cierre",
-          monto: monto_cierre
-        });
-
       } else if (estado === "Competencia") {
         venta.abierta = 0;
         venta.fecha_cierre = new Date();
         await venta.save();
-        
-        await enviarCorreoCierre({
-          prospecto,
-          estado: "Competencia",
-          monto: 0
-        });
-        
       }
   
       const otraAbierta = await VentaProspecto.findOne({
         where: {
           id_prospecto: prospecto.id_prospecto,
           abierta: 1,
-          id_venta: { [Op.ne]: venta.id_venta }  
+          id_venta: { [Op.ne]: venta.id_venta },
         },
       });
-      
   
       if (otraAbierta) {
         const estadoPlaneacion = await EstadoProspecto.findOne({ where: { nombre: "En Planeación" } });
@@ -274,17 +258,27 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
   
       await prospecto.save();
   
+      // RESPUESTA ANTES DEL ENVÍO DE CORREO
       res.json({
         message: "Seguimiento actualizado correctamente",
         seguimiento,
         venta,
         prospecto,
       });
+  
+      // ⏳ CORREO SE ENVÍA SIN BLOQUEAR AL USUARIO
+      if (estado === "Cierre") {
+        enviarCorreoCierre({ prospecto, estado: "Cierre", monto: monto_cierre }).catch(console.error);
+      } else if (estado === "Competencia") {
+        enviarCorreoCierre({ prospecto, estado: "Competencia", monto: 0 }).catch(console.error);
+      }
+  
     } catch (error) {
       console.error("Error al actualizar seguimiento:", error);
       res.status(500).json({ message: "Error al actualizar seguimiento", error });
     }
   };
+  
   
 
 /*// Eliminar un seguimiento

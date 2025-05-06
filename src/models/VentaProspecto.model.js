@@ -1,6 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 const Prospecto = require("./Prospecto.model");
+//const EstadoProspecto = require("./EstadoProspecto.model");
 
 const VentaProspecto = sequelize.define("VentaProspecto", {
     id_venta: {
@@ -38,6 +39,15 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
           return rawValue !== null ? parseFloat(rawValue) : null;
         },
       },
+      /*id_estado: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: EstadoProspecto,
+          key: "id_estado",
+        },
+        onDelete: "SET NULL",
+      },*/
        
     eliminado: {
         type: DataTypes.TINYINT,

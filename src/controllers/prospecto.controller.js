@@ -54,7 +54,7 @@ const obtenerProspectos = async (req, res) => {
         {
           model: VentaProspecto,
           as: "ventas",
-          attributes: ["id_venta", "monto_cierre", "abierta"],
+          attributes: ["id_venta", "monto_cierre", "abierta", "objetivo"],
           where: { eliminado: 0 },
           required: false,
           include: [{
