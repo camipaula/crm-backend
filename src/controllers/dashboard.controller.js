@@ -63,9 +63,11 @@ const obtenerDashboard = async (req, res) => {
     const ventasGanadas = ventasCerradas.filter(v => 
       v.estado_venta?.nombre === "Cierre"
     );
-    const ventasPerdidas = ventasCerradas.filter(v => 
-      v.estado_venta?.nombre === "Competencia"
-    );
+    
+    const ventasPerdidas = ventas.filter(v => 
+  v.estado_venta?.nombre === "Competencia"
+);
+
     
     const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
 
@@ -124,6 +126,22 @@ const obtenerDashboard = async (req, res) => {
         porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
       }));
       
+      // Filtrar prospecciones en competencia
+const tablaCompetencia = ventasPerdidas.map(v => ({
+  id_venta: v.id_venta,
+  prospecto: v.prospecto.nombre,
+  fecha_apertura: new Date(v.created_at),
+estado: v.estado_venta?.nombre || "Sin estado"
+}));
+
+const tablaAbiertas = ventas
+  .filter(v => v.abierta === 1)
+  .map(v => ({
+    prospecto: v.prospecto.nombre,
+    fecha_apertura: new Date(v.created_at),
+    estado: v.estado_venta?.nombre || "Sin estado"
+  }));
+
 
       return res.json({
         totalVentas,
@@ -137,6 +155,8 @@ const obtenerDashboard = async (req, res) => {
         promedioDiasCierre,
         promedioMontoCierre,
         tablaCierres,
+         tablaCompetencia,
+  tablaAbiertas,
         graficoVentas,
         graficoEstadosProspecto,
       });
