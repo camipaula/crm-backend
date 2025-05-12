@@ -5,7 +5,6 @@ const {
   obtenerProspectos,
   obtenerProspectoPorId,
   obtenerProspectosPorVendedora,
-  obtenerProspectosPorEstado,
   crearProspecto,
   actualizarProspecto,
   eliminarProspecto,
@@ -46,9 +45,6 @@ router.get("/categoria/:id_categoria", obtenerProspectosPorCategoria);
 
 // Obtener prospectos de una vendedora
 router.get("/vendedora/:cedula_vendedora", verificarToken, obtenerProspectosPorVendedora);
-
-// Obtener prospectos por estado
-router.get("/estado/:estado", verificarToken, obtenerProspectosPorEstado);
 
 // Obtener un prospecto por ID
 router.get("/:id_prospecto", verificarToken, obtenerProspectoPorId);

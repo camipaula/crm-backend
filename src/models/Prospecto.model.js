@@ -76,14 +76,7 @@
             type: DataTypes.STRING(255),
             allowNull: true,
         },
-        id_estado: {
-            type: DataTypes.INTEGER,
-            allowNull: true,
-            references: {
-              model: 'estado_prospecto',
-              key: 'id_estado',
-            }
-          },          
+                
         cedula_vendedora: {
             type: DataTypes.STRING(20),
             allowNull: true,

@@ -48,14 +48,12 @@ const obtenerSeguimientoPorId = async (req, res) => {
           include: [
             {
               model: Prospecto,
-              as: "prospecto",
-              include: [
-                {
-                  model: EstadoProspecto,
-                  as: "estado_prospecto",
-                  attributes: ["nombre"]
-                }
-              ]
+              as: "prospecto"
+            },
+            {
+              model: EstadoProspecto, 
+              as: "estado_venta",
+              attributes: ["nombre"]
             }
           ]
         },
@@ -64,6 +62,7 @@ const obtenerSeguimientoPorId = async (req, res) => {
           as: "tipo_seguimiento"
         }
       ]
+      
     });
 
     if (!seguimiento) {
@@ -88,13 +87,17 @@ const obtenerSeguimientosPorVendedora = async (req, res) => {
         {
           model: Prospecto,
           as: "prospecto",
-          where: { cedula_vendedora: cedula_ruc },
-          include: [{ model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] }]
+          where: { cedula_vendedora: cedula_ruc }
+        },
+        {
+          model: EstadoProspecto,
+          as: "estado_venta", // ✅ nuevo include correcto
+          attributes: ["nombre"]
         },
         {
           model: SeguimientoVenta,
           as: "seguimientos",
-          where: { eliminado: 0 }, 
+          where: { eliminado: 0 },
           required: false,
           include: [{ model: TipoSeguimiento, as: "tipo_seguimiento" }]
         }
@@ -129,9 +132,13 @@ const obtenerAgendaPorVendedora = async (req, res) => {
             {
               model: Prospecto,
               as: "prospecto",
-              attributes: ["nombre"],
-              include: [{ model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] }],
+              attributes: ["nombre"]
             },
+            {
+              model: EstadoProspecto,
+              as: "estado_venta",
+              attributes: ["nombre"]
+            }
           ],
         },
         { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] },
@@ -211,19 +218,26 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
         return res.status(404).json({ message: "Seguimiento no encontrado" });
       }
   
+      // 1. Marcar el seguimiento como realizado
       seguimiento.resultado = resultado;
       seguimiento.nota = nota;
       seguimiento.estado = "realizado";
       await seguimiento.save();
   
+      // 2. Obtener la venta y el prospecto
       const venta = seguimiento.venta;
       const prospecto = venta.prospecto;
   
+      // 3. Buscar el nuevo estado
       const nuevoEstado = await EstadoProspecto.findOne({ where: { nombre: estado } });
       if (!nuevoEstado) {
         return res.status(400).json({ message: `El estado '${estado}' no está registrado.` });
       }
   
+      // 4. Asignar el estado a la venta
+      venta.id_estado = nuevoEstado.id_estado;
+  
+      // 5. Si el estado es Cierre o Competencia, cerrar la venta
       if (estado === "Cierre") {
         if (!monto_cierre) {
           return res.status(400).json({ message: "Debes enviar el monto de cierre para una venta ganada." });
@@ -231,34 +245,14 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
         venta.abierta = 0;
         venta.fecha_cierre = new Date();
         venta.monto_cierre = monto_cierre;
-        await venta.save();
       } else if (estado === "Competencia") {
         venta.abierta = 0;
         venta.fecha_cierre = new Date();
-        await venta.save();
       }
   
-      const otraAbierta = await VentaProspecto.findOne({
-        where: {
-          id_prospecto: prospecto.id_prospecto,
-          abierta: 1,
-          id_venta: { [Op.ne]: venta.id_venta },
-        },
-      });
+      await venta.save();
   
-      if (otraAbierta) {
-        const estadoPlaneacion = await EstadoProspecto.findOne({ where: { nombre: "En Planeación" } });
-        if (!estadoPlaneacion) {
-          return res.status(400).json({ message: "Estado 'En Planeación' no está registrado." });
-        }
-        prospecto.id_estado = estadoPlaneacion.id_estado;
-      } else {
-        prospecto.id_estado = nuevoEstado.id_estado;
-      }
-  
-      await prospecto.save();
-  
-      // RESPUESTA ANTES DEL ENVÍO DE CORREO
+      // 6. RESPUESTA
       res.json({
         message: "Seguimiento actualizado correctamente",
         seguimiento,
@@ -266,7 +260,7 @@ if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
         prospecto,
       });
   
-      // ⏳ CORREO SE ENVÍA SIN BLOQUEAR AL USUARIO
+      // 7. Enviar correo si es necesario (sin bloquear al usuario)
       if (estado === "Cierre") {
         enviarCorreoCierre({ prospecto, estado: "Cierre", monto: monto_cierre }).catch(console.error);
       } else if (estado === "Competencia") {
@@ -378,16 +372,14 @@ const exportarSeguimientos = async (req, res) => {
             {
               model: Prospecto,
               as: "prospecto",
-              attributes: ["nombre"],
-              include: [
-                {
-                  model: EstadoProspecto,
-                  as: "estado_prospecto",
-                  attributes: ["nombre"],
-                }
-              ]
+              attributes: ["nombre"]
+            },
+            {
+              model: EstadoProspecto,
+              as: "estado_venta",
+              attributes: ["nombre"]
             }
-          ],
+          ],          
         },
         { model: Usuario, as: "vendedora_seguimiento", attributes: ["nombre"] },
         { model: TipoSeguimiento, as: "tipo_seguimiento", attributes: ["descripcion"] },
@@ -419,7 +411,7 @@ const exportarSeguimientos = async (req, res) => {
       sheet.addRow({
         id_seguimiento: s.id_seguimiento,
         prospecto: s.venta?.prospecto?.nombre || "Sin Prospecto",
-        estado_prospecto: s.venta?.prospecto?.estado_prospecto?.nombre || "Sin estado", // ✅ nuevo
+        estado_prospecto: s.venta?.estado_venta?.nombre || "Sin estado",
         vendedora: s.vendedora_seguimiento?.nombre || "No asignada",
         venta: s.venta?.objetivo || "Sin Venta",
         fecha_programada: s.fecha_programada
@@ -463,17 +455,16 @@ const obtenerAgendaGeneral = async (req, res) => {
             {
               model: Prospecto,
               as: "prospecto",
-              attributes: ["nombre"],
-              include: [
-                {
-                  model: EstadoProspecto,
-                  as: "estado_prospecto",
-                  attributes: ["nombre"], // ✅ Se incluye estado
-                }
-              ]
+              attributes: ["nombre"]
             },
+            {
+              model: EstadoProspecto,
+              as: "estado_venta", 
+              attributes: ["nombre"]
+            }
           ],
         },
+      
         {
           model: Usuario,
           as: "vendedora_seguimiento",
@@ -511,16 +502,15 @@ const editarSeguimiento = async (req, res) => {
             {
               model: Prospecto,
               as: "prospecto",
-              attributes: ["nombre"],
-              include: [
-                {
-                  model: EstadoProspecto,
-                  as: "estado_prospecto",
-                  attributes: ["nombre"]
-                }
-              ]
+              attributes: ["nombre"]
+            },
+            {
+              model: EstadoProspecto,
+              as: "estado_venta",
+              attributes: ["nombre"]
             }
           ]
+          
         }
       ]
     });

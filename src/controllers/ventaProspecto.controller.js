@@ -4,6 +4,7 @@
   const TipoSeguimiento = require("../models/TipoSeguimiento.model");
   const EstadoProspecto = require("../models/EstadoProspecto.model");
   const Usuario = require("../models/Usuario.model");
+
   const { Op } = require("sequelize");
 
   // Obtener todas las ventas de prospectos con sus seguimientos
@@ -19,8 +20,8 @@
             include: [
               {
                 model: EstadoProspecto,
-                as: "estado_prospecto",
-                attributes: ["nombre"],
+                as: "estado_venta", 
+                attributes: ["id_estado", "nombre"]
               },
               {
                 model: Usuario,
@@ -72,11 +73,7 @@
             as: "prospecto",
             attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono", "cedula_vendedora"],
             include: [
-              {
-                model: EstadoProspecto,
-                as: "estado_prospecto",
-                attributes: ["nombre"]
-              },
+              
               {
                 model: Usuario,
                 as: "vendedora_prospecto",
@@ -120,15 +117,17 @@
       const venta = await VentaProspecto.findByPk(id_venta, {
         include: [
           {
+            model: EstadoProspecto,
+            as: "estado_venta",
+            attributes: ["id_estado", "nombre"]
+          }, 
+          {
+            
             model: Prospecto,
             as: "prospecto",
             attributes: ["id_prospecto", "nombre", "nombre_contacto", "correo", "telefono", "direccion", "cedula_vendedora", "created_at"],
             include: [
-              {
-                model: EstadoProspecto,
-                as: "estado_prospecto",
-                attributes: ["nombre"]
-              },
+                          
               {
                 model: Usuario,
                 as: "vendedora_prospecto",
@@ -167,12 +166,17 @@
   const crearVenta = async (req, res) => {
     try {
       const { id_prospecto, objetivo } = req.body;
-
+      const estadoNuevo = await EstadoProspecto.findOne({ where: { nombre: "nuevo" } });
+      if (!estadoNuevo) {
+        return res.status(500).json({ message: "No se encontró el estado 'nuevo' en la base de datos" });
+      }
+      
       const nuevaVenta = await VentaProspecto.create({
         id_prospecto,
         objetivo,
         abierta: 1,
         eliminado: 0,
+        id_estado: estadoNuevo.id_estado 
       });
       res.status(201).json({ id_venta: nuevaVenta.id_venta });
     } catch (error) {
@@ -312,9 +316,13 @@
             attributes: ["id_prospecto", "nombre", "cedula_vendedora"],
             where: Object.keys(prospectoWhere).length ? prospectoWhere : undefined,
             include: [
-              { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
               { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre", "estado"] }
             ],
+          },
+          {
+            model: EstadoProspecto,
+            as: "estado_venta", // ✅ esta sí es válida porque está en VentaProspecto
+            attributes: ["id_estado", "nombre"]
           },
           {
             model: SeguimientoVenta,
@@ -395,6 +403,25 @@
   };
 
 
+// Actualizar el monto de una venta ganada
+const actualizarMontoCierre = async (req, res) => {
+  try {
+    const { id_venta, monto } = req.body;
+
+    const venta = await VentaProspecto.findByPk(id_venta);
+    if (!venta || venta.eliminado === 1) {
+      return res.status(404).json({ message: "Venta no encontrada" });
+    }
+
+    venta.monto_cierre = monto;
+    await venta.save();
+
+    res.json({ message: "Monto de cierre actualizado correctamente" });
+  } catch (error) {
+    console.error("Error al actualizar monto de cierre:", error);
+    res.status(500).json({ message: "Error al actualizar monto", error });
+  }
+};
 
   module.exports = {
     obtenerVentas,
@@ -404,5 +431,6 @@
     cerrarVenta,
     eliminarVenta,
     editarObjetivoVenta,
-    obtenerProspeccionesAgrupadas
+    obtenerProspeccionesAgrupadas,
+    actualizarMontoCierre
   };

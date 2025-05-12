@@ -39,21 +39,11 @@ SeguimientoVenta.belongsTo(TipoSeguimiento, { foreignKey: "id_tipo", as: "tipo_s
 
 
 // Relaciones estado y venta 
-//VentaProspecto.belongsTo(Prospecto, { foreignKey: "id_prospecto" });
-//VentaProspecto.belongsTo(EstadoProspecto, { foreignKey: "id_estado" });
 
-// Relación Prospecto - EstadoProspecto (1 a 1)
-EstadoProspecto.hasMany(Prospecto, {
-    foreignKey: "id_estado",
-    as: "prospectos_estado",
-    onDelete: "SET NULL"
-  });
-  Prospecto.belongsTo(EstadoProspecto, {
-    foreignKey: "id_estado",
-    as: "estado_prospecto"
-  });
-  
-  
+VentaProspecto.belongsTo(EstadoProspecto, { foreignKey: "id_estado", as: "estado_venta" });
+// Relación con Prospecto
+VentaProspecto.belongsTo(Prospecto, { foreignKey: "id_prospecto" });
+
 module.exports = { 
     Usuario, 
     Prospecto, 

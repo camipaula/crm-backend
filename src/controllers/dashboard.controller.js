@@ -45,21 +45,28 @@ const obtenerDashboard = async (req, res) => {
           where: filtrosProspecto,
           required: true,
           include: [
-            { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] },
             { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] }
           ]
+        },
+        {
+          model: EstadoProspecto,
+          as: "estado_venta", // 👈 nuevo include correcto
+          attributes: ["nombre"]
         }
       ]
     });
+    
 
     const totalVentas = ventas.length;
     const ventasCerradas = ventas.filter(v => v.abierta === 0);
 
     const ventasGanadas = ventasCerradas.filter(v => 
-      v.prospecto.estado_prospecto?.nombre === "Cierre"
+      v.estado_venta?.nombre === "Cierre"
     );
-    const ventasPerdidas = ventasCerradas.filter(v => v.prospecto.estado_prospecto?.nombre === "Competencia");
-
+    const ventasPerdidas = ventasCerradas.filter(v => 
+      v.estado_venta?.nombre === "Competencia"
+    );
+    
     const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
 
     const porcentajeGanadas = totalVentas > 0
@@ -77,6 +84,7 @@ const obtenerDashboard = async (req, res) => {
       const cerrada = v.fecha_cierre ? new Date(v.fecha_cierre) : null;
       const dias = cerrada ? Math.ceil((cerrada - creada) / (1000 * 60 * 60 * 24)) : 0;
       return {
+        id_venta: v.id_venta, 
         prospecto: v.prospecto.nombre,
         fecha_apertura: creada,
         fecha_cierre: cerrada,
@@ -104,26 +112,18 @@ const obtenerDashboard = async (req, res) => {
         { estado: "Perdidas", cantidad: ventasPerdidas.length }
       ];
 
-    // Todos los prospectos para graficar estados
-    const estadosProspectos = await Prospecto.findAll({
-      where: filtrosProspecto,
-      include: [
-        { model: EstadoProspecto, as: "estado_prospecto", attributes: ["nombre"] }
-      ]
-    });
-
-    const resumenEstados = {};
-    estadosProspectos.forEach(p => {
-      const estado = p.estado_prospecto?.nombre || "Desconocido";
-      resumenEstados[estado] = (resumenEstados[estado] || 0) + 1;
-    });
-
-    const totalProspectos = estadosProspectos.length;
-const graficoEstadosProspecto = Object.entries(resumenEstados).map(([estado, cantidad]) => ({
-  estado,
-  cantidad,
-  porcentaje: totalProspectos > 0 ? ((cantidad / totalProspectos) * 100).toFixed(2) : 0
-}));
+      const resumenEstadosVenta = {};
+      ventas.forEach(v => {
+        const estado = v.estado_venta?.nombre || "Desconocido";
+        resumenEstadosVenta[estado] = (resumenEstadosVenta[estado] || 0) + 1;
+      });
+      
+      const graficoEstadosProspecto = Object.entries(resumenEstadosVenta).map(([estado, cantidad]) => ({
+        estado,
+        cantidad,
+        porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
+      }));
+      
 
       return res.json({
         totalVentas,

@@ -1,7 +1,7 @@
 const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 const Prospecto = require("./Prospecto.model");
-//const EstadoProspecto = require("./EstadoProspecto.model");
+const EstadoProspecto = require("./EstadoProspecto.model");
 
 const VentaProspecto = sequelize.define("VentaProspecto", {
     id_venta: {
@@ -39,7 +39,7 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
           return rawValue !== null ? parseFloat(rawValue) : null;
         },
       },
-      /*id_estado: {
+      id_estado: {
         type: DataTypes.INTEGER,
         allowNull: true,
         references: {
@@ -47,7 +47,7 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
           key: "id_estado",
         },
         onDelete: "SET NULL",
-      },*/
+      },
        
     eliminado: {
         type: DataTypes.TINYINT,
@@ -61,7 +61,6 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
     updatedAt: "updated_at",  
 });
 
-// Relación con Prospecto
-VentaProspecto.belongsTo(Prospecto, { foreignKey: "id_prospecto" });
+
 
 module.exports = VentaProspecto;

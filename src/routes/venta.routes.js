@@ -7,7 +7,8 @@ const {
   cerrarVenta,
   eliminarVenta,
   editarObjetivoVenta,
-  obtenerProspeccionesAgrupadas
+  obtenerProspeccionesAgrupadas,
+  actualizarMontoCierre
 } = require("../controllers/ventaProspecto.controller")
 
 const verificarToken = require("../middlewares/authMiddleware");
@@ -37,5 +38,7 @@ router.put("/:id_venta/cerrar", verificarToken, cerrarVenta);
 router.delete("/:id_venta", verificarToken, eliminarVenta);
 
 router.put("/:id_venta/objetivo", verificarToken, editarObjetivoVenta);
+
+router.put("/actualizar-monto", verificarToken, actualizarMontoCierre);
 
 module.exports = router;
