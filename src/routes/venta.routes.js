@@ -12,6 +12,7 @@ const {
 } = require("../controllers/ventaProspecto.controller")
 
 const verificarToken = require("../middlewares/authMiddleware");
+const soloLectura = require("../middlewares/soloLectura");
 
 const router = express.Router();
 
@@ -29,16 +30,16 @@ router.get("/", verificarToken, obtenerVentas);
 router.get("/:id_venta", verificarToken, obtenerVentaPorId);
 
 // Crear una nueva venta para un prospecto
-router.post("/", verificarToken, crearVenta);
+router.post("/", verificarToken,soloLectura, crearVenta);
 
 // Cerrar una venta (cambiar estado a cerrada)
-router.put("/:id_venta/cerrar", verificarToken, cerrarVenta);
+router.put("/:id_venta/cerrar", verificarToken,soloLectura, cerrarVenta);
 
 // Eliminar una venta
-router.delete("/:id_venta", verificarToken, eliminarVenta);
+router.delete("/:id_venta", verificarToken, soloLectura,eliminarVenta);
 
-router.put("/:id_venta/objetivo", verificarToken, editarObjetivoVenta);
+router.put("/:id_venta/objetivo", verificarToken,soloLectura, editarObjetivoVenta);
 
-router.put("/actualizar-monto", verificarToken, actualizarMontoCierre);
+router.put("/actualizar-monto", verificarToken,soloLectura, actualizarMontoCierre);
 
 module.exports = router;

@@ -15,6 +15,7 @@ const {
 } = require("../controllers/seguimientoVenta.controller");  
 
 const verificarToken = require("../middlewares/authMiddleware");
+const soloLectura = require("../middlewares/soloLectura");
 
 const router = express.Router();
 
@@ -41,19 +42,19 @@ router.get("/vendedora/:cedula_ruc", verificarToken, obtenerSeguimientosPorVende
 router.get("/", verificarToken, obtenerSeguimientos);
 
 // Crear un nuevo seguimiento
-router.post("/", verificarToken, crearSeguimiento);
+router.post("/", verificarToken,soloLectura, crearSeguimiento);
 
 //editar un seguimiento 
-router.put("/:id_seguimiento/editar", verificarToken, editarSeguimiento);
+router.put("/:id_seguimiento/editar", verificarToken,soloLectura, editarSeguimiento);
 
 // Obtener un seguimiento por su ID
 router.get("/:id_seguimiento", verificarToken, obtenerSeguimientoPorId);
 
 // Registrar resultado de un seguimiento (Actualizar estado)
-router.put("/:id_seguimiento", verificarToken, registrarResultadoSeguimiento); 
+router.put("/:id_seguimiento", verificarToken,soloLectura, registrarResultadoSeguimiento); 
 
 // Eliminar un seguimiento
-router.delete("/:id_seguimiento", verificarToken, eliminarSeguimiento);
+router.delete("/:id_seguimiento", verificarToken,soloLectura, eliminarSeguimiento);
 
 
 

@@ -10,6 +10,7 @@ const {
 } = require("../controllers/usuario.controller");
 
 const verificarToken = require("../middlewares/authMiddleware");
+const soloLectura = require("../middlewares/soloLectura");
 
 const router = express.Router();
 
@@ -20,16 +21,16 @@ router.get("/vendedoras", obtenerVendedoras);
 router.get("/vendedoras/:cedula_ruc", obtenerVendedoraPorCedula);
 
 // Ruta para Editar Vendedora
-router.put("/vendedoras/:cedula_ruc", actualizarVendedora);
+router.put("/vendedoras/:cedula_ruc", verificarToken,soloLectura, actualizarVendedora);
 
 // Ruta para inactivar vendedora (opcional si prefieres separarla)
-router.patch("/vendedoras/:cedula_ruc/inactivar", cambiarEstadoVendedora);
+router.patch("/vendedoras/:cedula_ruc/inactivar",verificarToken, soloLectura, cambiarEstadoVendedora);
 
 // Ruta para eliminar Vendedora
-router.delete("/vendedoras/:cedula_ruc", eliminarVendedora);
+router.delete("/vendedoras/:cedula_ruc",verificarToken,soloLectura, eliminarVendedora);
 
-router.get("/mi-perfil", verificarToken, obtenerPerfilAdmin);
-router.put("/mi-perfil", verificarToken, actualizarPerfilAdmin);
+router.get("/mi-perfil", verificarToken,soloLectura, obtenerPerfilAdmin);
+router.put("/mi-perfil", verificarToken,soloLectura, actualizarPerfilAdmin);
 
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const express = require("express");
 const upload = require("../middlewares/upload");
+const soloLectura = require("../middlewares/soloLectura");
 
 const {
   obtenerProspectos,
@@ -50,16 +51,16 @@ router.get("/vendedora/:cedula_vendedora", verificarToken, obtenerProspectosPorV
 router.get("/:id_prospecto", verificarToken, obtenerProspectoPorId);
 
 // Crear un nuevo prospecto
-router.post("/", verificarToken, upload.single("archivo"), crearProspecto);
+router.post("/", verificarToken,soloLectura, upload.single("archivo"), crearProspecto);
 
 // Actualizar un prospecto por ID
-router.put("/:id_prospecto", upload.single("archivo"), actualizarProspecto);
+router.put("/:id_prospecto",soloLectura, upload.single("archivo"), actualizarProspecto);
 
 // Eliminar un prospecto por ID
-router.delete("/:id_prospecto", verificarToken, eliminarProspecto);
+router.delete("/:id_prospecto", verificarToken,soloLectura, eliminarProspecto);
 
 
-router.put("/:id_prospecto/eliminar", verificarToken, eliminarProspecto);
+router.put("/:id_prospecto/eliminar", verificarToken, soloLectura, eliminarProspecto);
 
 
 module.exports = router;
