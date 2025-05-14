@@ -3,6 +3,7 @@ const Prospecto = require("../models/Prospecto.model");
 const VentaProspecto = require("../models/VentaProspecto.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model");
 const Usuario = require("../models/Usuario.model");
+const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 
 const estadosInteres = ["En Planeación", "En Atracción"];
 
@@ -23,10 +24,14 @@ const obtenerDashboard = async (req, res) => {
 
     // Validar fechas antes de usarlas
     if (fecha_inicio && fecha_fin) {
+      const fechaInicioDate = new Date(fecha_inicio);
+      const fechaFinDate = new Date(fecha_fin);
+      fechaFinDate.setHours(23, 59, 59, 999);
+
       filtrosVenta.created_at = {
-        [Op.between]: [new Date(fecha_inicio), new Date(fecha_fin)]
+        [Op.between]: [fechaInicioDate, fechaFinDate]
       };
-      
+
     }
 
     if (cedula_vendedora) filtrosProspecto.cedula_vendedora = cedula_vendedora;
@@ -36,48 +41,58 @@ const obtenerDashboard = async (req, res) => {
     if (ciudad) filtrosProspecto.ciudad = ciudad;
 
     // Buscar ventas con prospecto y sus relaciones
-    const ventas = await VentaProspecto.findAll({
-      where: filtrosVenta,
+   const ventas = await VentaProspecto.findAll({
+  where: filtrosVenta,
+  include: [
+    {
+      model: Prospecto,
+      as: "prospecto",
+      where: filtrosProspecto,
+      required: true,
+      attributes: ["nombre", "empleados"],
       include: [
-        {
-          model: Prospecto,
-          as: "prospecto",
-          where: filtrosProspecto,
-          required: true,
-          include: [
-            { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] }
-          ]
-        },
-        {
-          model: EstadoProspecto,
-          as: "estado_venta", // 👈 nuevo include correcto
-          attributes: ["nombre"]
-        }
+        { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] }
       ]
-    });
-    
+    },
+    {
+      model: EstadoProspecto,
+      as: "estado_venta",
+      attributes: ["nombre"]
+    },
+    {
+      model: SeguimientoVenta,
+      as: "seguimientos",
+      where: { eliminado: 0 },
+      required: false,
+      order: [["fecha_programada", "DESC"]],
+      limit: 1 // traer solo el más reciente
+    }
+  ]
+});
+
+
 
     const totalVentas = ventas.length;
     const ventasCerradas = ventas.filter(v => v.abierta === 0);
 
-    const ventasGanadas = ventasCerradas.filter(v => 
+    const ventasGanadas = ventasCerradas.filter(v =>
       v.estado_venta?.nombre === "Cierre"
     );
-    
-    const ventasPerdidas = ventas.filter(v => 
-  v.estado_venta?.nombre === "Competencia"
-);
 
-    
+    const ventasPerdidas = ventas.filter(v =>
+      v.estado_venta?.nombre === "Competencia"
+    );
+
+
     const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
 
     const porcentajeGanadas = totalVentas > 0
-    ? (ventasGanadas.length / totalVentas) * 100
-    : 0;
+      ? (ventasGanadas.length / totalVentas) * 100
+      : 0;
 
     const porcentajePerdidas = totalVentas > 0
-  ? (ventasPerdidas.length / totalVentas) * 100
-  : 0;
+      ? (ventasPerdidas.length / totalVentas) * 100
+      : 0;
 
     const porcentajeCerradas = totalVentas > 0 ? (ventasCerradas.length / totalVentas) * 100 : 0;
 
@@ -86,17 +101,21 @@ const obtenerDashboard = async (req, res) => {
       const cerrada = v.fecha_cierre ? new Date(v.fecha_cierre) : null;
       const dias = cerrada ? Math.ceil((cerrada - creada) / (1000 * 60 * 60 * 24)) : 0;
       return {
-        id_venta: v.id_venta, 
+        id_venta: v.id_venta,
         prospecto: v.prospecto.nombre,
         fecha_apertura: creada,
         fecha_cierre: cerrada,
         dias,
+         monto_proyectado: v.monto_proyectado ?? null, 
         monto: v.monto_cierre || 0,
+numero_empleados: v.prospecto.empleados !== null && v.prospecto.empleados !== undefined
+  ? v.prospecto.empleados
+  : "No registrado",
       };
     });
 
 
-    
+
     const promedioDiasCierre = tablaCierres.length > 0
       ? Math.round(tablaCierres.reduce((sum, r) => sum + r.dias, 0) / tablaCierres.length)
       : 0;
@@ -108,61 +127,74 @@ const obtenerDashboard = async (req, res) => {
 
 
 
-      const graficoVentas = [
-        { estado: "Abiertas", cantidad: totalVentasAbiertas },
-        { estado: "Ganadas", cantidad: ventasGanadas.length },
-        { estado: "Perdidas", cantidad: ventasPerdidas.length }
-      ];
+    const graficoVentas = [
+      { estado: "Abiertas", cantidad: totalVentasAbiertas },
+      { estado: "Ganadas", cantidad: ventasGanadas.length },
+      { estado: "Perdidas", cantidad: ventasPerdidas.length }
+    ];
 
-      const resumenEstadosVenta = {};
-      ventas.forEach(v => {
-        const estado = v.estado_venta?.nombre || "Desconocido";
-        resumenEstadosVenta[estado] = (resumenEstadosVenta[estado] || 0) + 1;
-      });
-      
-      const graficoEstadosProspecto = Object.entries(resumenEstadosVenta).map(([estado, cantidad]) => ({
-        estado,
-        cantidad,
-        porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
-      }));
-      
-      // Filtrar prospecciones en competencia
-const tablaCompetencia = ventasPerdidas.map(v => ({
-  id_venta: v.id_venta,
-  prospecto: v.prospecto.nombre,
-  fecha_apertura: new Date(v.created_at),
-estado: v.estado_venta?.nombre || "Sin estado"
-}));
+    const resumenEstadosVenta = {};
+    ventas.forEach(v => {
+      const estado = v.estado_venta?.nombre || "Desconocido";
+      resumenEstadosVenta[estado] = (resumenEstadosVenta[estado] || 0) + 1;
+    });
 
-const tablaAbiertas = ventas
-  .filter(v => v.abierta === 1)
-  .map(v => ({
+    const graficoEstadosProspecto = Object.entries(resumenEstadosVenta).map(([estado, cantidad]) => ({
+      estado,
+      cantidad,
+      porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
+    }));
+
+    // Filtrar prospecciones en competencia
+    const tablaCompetencia = ventasPerdidas.map(v => {
+  const ultimoSeguimiento = v.seguimientos?.[0];
+
+  return {
+    id_venta: v.id_venta,
     prospecto: v.prospecto.nombre,
     fecha_apertura: new Date(v.created_at),
-    estado: v.estado_venta?.nombre || "Sin estado"
-  }));
+    estado: v.estado_venta?.nombre || "Sin estado",
+    ultimo_resultado: ultimoSeguimiento?.resultado || "Sin resultado"
+  };
+});
 
 
-      return res.json({
-        totalVentas,
-        totalVentasAbiertas,
-        totalVentasGanadas: ventasGanadas.length,
-  totalVentasPerdidas: ventasPerdidas.length,
-        totalVentasCerradas: ventasCerradas.length,
-        porcentajeGanadas,
-        porcentajePerdidas,
+   const tablaAbiertas = ventas
+  .filter(v => v.abierta === 1)
+  .map(v => {
+    const ultimoSeguimiento = v.seguimientos?.[0];
 
-        promedioDiasCierre,
-        promedioMontoCierre,
-        tablaCierres,
-         tablaCompetencia,
-  tablaAbiertas,
-        graficoVentas,
-        graficoEstadosProspecto,
-      });
-      
-      
-      
+    return {
+      id_venta: v.id_venta,
+      prospecto: v.prospecto.nombre,
+      fecha_apertura: new Date(v.created_at),
+      estado: v.estado_venta?.nombre || "Sin estado",
+      ultimo_resultado: ultimoSeguimiento?.resultado || "Sin resultado"
+    };
+  });
+
+
+
+    return res.json({
+      totalVentas,
+      totalVentasAbiertas,
+      totalVentasGanadas: ventasGanadas.length,
+      totalVentasPerdidas: ventasPerdidas.length,
+      totalVentasCerradas: ventasCerradas.length,
+      porcentajeGanadas,
+      porcentajePerdidas,
+
+      promedioDiasCierre,
+      promedioMontoCierre,
+      tablaCierres,
+      tablaCompetencia,
+      tablaAbiertas,
+      graficoVentas,
+      graficoEstadosProspecto,
+    });
+
+
+
   } catch (error) {
     console.error(" Error en dashboard:", error);
     return res.status(500).json({ message: "Error obteniendo dashboard", error: error.message });

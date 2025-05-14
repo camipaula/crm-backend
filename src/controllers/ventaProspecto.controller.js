@@ -65,7 +65,7 @@
           id_prospecto,
           eliminado: 0
         },
-        attributes: ["id_venta", "objetivo", "abierta", "fecha_cierre", "monto_cierre"],
+        attributes: ["id_venta", "objetivo", "abierta", "fecha_cierre", "monto_cierre","monto_proyectado"],
 
         include: [
           {
@@ -176,7 +176,9 @@
         objetivo,
         abierta: 1,
         eliminado: 0,
-        id_estado: estadoNuevo.id_estado 
+        id_estado: estadoNuevo.id_estado,
+        monto_proyectado: monto_proyectado || null 
+ 
       });
       res.status(201).json({ id_venta: nuevaVenta.id_venta });
     } catch (error) {
@@ -208,23 +210,29 @@
   };
 
   // Editar el objetivo de una venta
-  const editarObjetivoVenta = async (req, res) => {
-    try {
-      const { id_venta } = req.params;
-      const { objetivo } = req.body;
+  // Editar objetivo y monto_proyectado
+const editarObjetivoVenta = async (req, res) => {
+  try {
+    const { id_venta } = req.params;
+    const { objetivo, monto_proyectado } = req.body;
 
-      const venta = await VentaProspecto.findByPk(id_venta);
-      if (!venta) return res.status(404).json({ message: "Venta no encontrada" });
+    const venta = await VentaProspecto.findByPk(id_venta);
+    if (!venta) return res.status(404).json({ message: "Venta no encontrada" });
 
-      venta.objetivo = objetivo;
-      await venta.save();
-
-      res.json({ message: "Objetivo actualizado correctamente", venta });
-    } catch (error) {
-      console.error("Error al editar objetivo:", error);
-      res.status(500).json({ message: "Error al editar objetivo", error });
+    venta.objetivo = objetivo ?? venta.objetivo;
+    if (monto_proyectado !== undefined) {
+      if (monto_proyectado < 0) return res.status(400).json({ message: "El monto proyectado no puede ser negativo" });
+      venta.monto_proyectado = monto_proyectado;
     }
-  };
+
+    await venta.save();
+
+    res.json({ message: "Objetivo y monto proyectado actualizados", venta });
+  } catch (error) {
+    console.error("Error al editar objetivo:", error);
+    res.status(500).json({ message: "Error al editar objetivo", error });
+  }
+};
 
 
   /*// Eliminar una venta
