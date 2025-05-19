@@ -8,7 +8,8 @@ const {
   eliminarVenta,
   editarObjetivoVenta,
   obtenerProspeccionesAgrupadas,
-  actualizarMontoCierre
+  actualizarMontoCierre,
+  reabrirVenta
 } = require("../controllers/ventaProspecto.controller")
 
 const verificarToken = require("../middlewares/authMiddleware");
@@ -37,6 +38,8 @@ router.put("/:id_venta/cerrar", verificarToken,soloLectura, cerrarVenta);
 
 // Eliminar una venta
 router.delete("/:id_venta", verificarToken, soloLectura,eliminarVenta);
+
+router.put("/:id_venta/reabrir", verificarToken, soloLectura, reabrirVenta);
 
 router.put("/:id_venta/objetivo", verificarToken,soloLectura, editarObjetivoVenta);
 

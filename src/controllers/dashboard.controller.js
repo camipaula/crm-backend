@@ -4,6 +4,7 @@ const VentaProspecto = require("../models/VentaProspecto.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model");
 const Usuario = require("../models/Usuario.model");
 const SeguimientoVenta = require("../models/SeguimientoVenta.model");
+const CategoriaProspecto = require("../models/CategoriaProspecto.model");
 
 const estadosInteres = ["En Planeación", "En Atracción"];
 
@@ -51,7 +52,9 @@ const obtenerDashboard = async (req, res) => {
       required: true,
       attributes: ["nombre", "empleados"],
       include: [
-        { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] }
+        { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
+{ model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }
+
       ]
     },
     {
@@ -125,6 +128,18 @@ numero_empleados: v.prospecto.empleados !== null && v.prospecto.empleados !== un
       : 0;
 
 
+// Agrupar prospectos por categoría
+const resumenCategorias = {};
+
+ventas.forEach(v => {
+const categoria = v.prospecto?.categoria_prospecto?.nombre || "Sin categoría";
+  resumenCategorias[categoria] = (resumenCategorias[categoria] || 0) + 1;
+});
+
+const graficoCategorias = Object.entries(resumenCategorias).map(([nombre, cantidad]) => ({
+  categoria: nombre,
+  cantidad
+}));
 
 
     const graficoVentas = [
@@ -191,6 +206,8 @@ numero_empleados: v.prospecto.empleados !== null && v.prospecto.empleados !== un
       tablaAbiertas,
       graficoVentas,
       graficoEstadosProspecto,
+      graficoCategorias,
+
     });
 
 
