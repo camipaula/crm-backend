@@ -154,11 +154,13 @@ const graficoCategorias = Object.entries(resumenCategorias).map(([nombre, cantid
       resumenEstadosVenta[estado] = (resumenEstadosVenta[estado] || 0) + 1;
     });
 
-    const graficoEstadosProspecto = Object.entries(resumenEstadosVenta).map(([estado, cantidad]) => ({
-      estado,
-      cantidad,
-      porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
-    }));
+ const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
+  .map(([estado, cantidad]) => ({
+    estado,
+    cantidad,
+    porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
+  }))
+  .sort((a, b) => a.cantidad - b.cantidad); 
 
     // Filtrar prospecciones en competencia
     const tablaCompetencia = ventasPerdidas.map(v => {

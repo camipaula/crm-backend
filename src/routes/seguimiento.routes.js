@@ -11,7 +11,8 @@ const {
   obtenerTiposSeguimiento,
   exportarSeguimientos,
   obtenerAgendaGeneral,
-  editarSeguimiento
+  editarSeguimiento,
+  crearSeguimientoConHoraAutomatica
 } = require("../controllers/seguimientoVenta.controller");  
 
 const verificarToken = require("../middlewares/authMiddleware");
@@ -43,6 +44,9 @@ router.get("/", verificarToken, obtenerSeguimientos);
 
 // Crear un nuevo seguimiento
 router.post("/", verificarToken,soloLectura, crearSeguimiento);
+
+// Crear un seguimiento con hora automática asignada
+router.post("/auto", verificarToken, soloLectura, crearSeguimientoConHoraAutomatica);
 
 //editar un seguimiento 
 router.put("/:id_seguimiento/editar", verificarToken,soloLectura, editarSeguimiento);

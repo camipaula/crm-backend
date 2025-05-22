@@ -336,7 +336,7 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
         },
         {
           model: EstadoProspecto,
-          as: "estado_venta", // ✅ esta sí es válida porque está en VentaProspecto
+          as: "estado_venta", // esta sí es válida porque está en VentaProspecto
           attributes: ["id_estado", "nombre"]
         },
         {

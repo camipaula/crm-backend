@@ -213,27 +213,31 @@ const crearProspecto = async (req, res) => {
       return res.status(403).json({ message: "No puede crear prospectos. Su cuenta está inactiva." });
     }
 
+    const toUpper = (text) => typeof text === "string" ? text.toUpperCase() : text;
+
     const {
       cedula_ruc,
-      nombre,
-      nombre_contacto,
-      correo,
-      telefono,
-      direccion,
-      provincia,
-      ciudad,
-      sector,
       id_origen,
       id_categoria,
-      descripcion,
-      nota,
       cedula_vendedora,
       created_at,
       empleados,
       monto_proyectado
     } = req.body;
 
-    // 🔁 Asignación de vendedora
+    const nombre = toUpper(req.body.nombre);
+    const nombre_contacto = toUpper(req.body.nombre_contacto);
+    const correo = toUpper(req.body.correo);
+    const telefono = toUpper(req.body.telefono);
+    const direccion = toUpper(req.body.direccion);
+    const provincia = toUpper(req.body.provincia);
+    const ciudad = toUpper(req.body.ciudad);
+    const sector = toUpper(req.body.sector);
+    const descripcion = toUpper(req.body.descripcion);
+    const nota = toUpper(req.body.nota);
+
+
+    //  Asignación de vendedora
     let asignarVendedora = cedula_vendedora;
     if (req.usuario.rol === "vendedora") {
       asignarVendedora = req.usuario.cedula_ruc;
