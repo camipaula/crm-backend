@@ -12,7 +12,7 @@ function parseLocalDatetime(datetimeStr) {
   const [datePart, timePart] = datetimeStr.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
   const [hour, minute] = timePart.split(":").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, hour, minute)); // ⬅️ UTC real
+  return new Date(Date.UTC(year, month - 1, day, hour, minute)); // UTC real
 }
 
 // Obtener todos los seguimientos
@@ -122,7 +122,18 @@ const obtenerAgendaPorVendedora = async (req, res) => {
         cedula_vendedora,
         estado: "pendiente",
         eliminado: 0
-      },
+     },
+  attributes: [
+    "id_seguimiento",
+    "fecha_programada",
+    "duracion_minutos", 
+    "id_tipo",
+    "motivo",
+    "nota",
+    "cedula_vendedora",
+    "estado",
+    "resultado"
+  ],
       include: [
         {
           model: VentaProspecto,
@@ -159,10 +170,18 @@ const obtenerAgendaPorVendedora = async (req, res) => {
 // Crear un seguimiento para una venta
 const crearSeguimiento = async (req, res) => {
   try {
-    const { id_venta, cedula_vendedora, fecha_programada, id_tipo, motivo, nota } = req.body;
+    const {
+      id_venta,
+      cedula_vendedora,
+      fecha_programada,
+      id_tipo,
+      motivo,
+      nota,
+      duracion_minutos
+    } = req.body;
+
     const fechaUTC = parseLocalDatetime(fecha_programada);
 
-    // Validación: No más de 1 año en adelante
     const hoy = new Date();
     const maxFecha = new Date();
     maxFecha.setFullYear(hoy.getFullYear() + 1);
@@ -171,17 +190,16 @@ const crearSeguimiento = async (req, res) => {
       return res.status(400).json({ message: "La fecha programada no puede ser mayor a un año desde hoy." });
     }
 
-    // Obtener la vendedora asociada al prospecto o al seguimiento
     const vendedoraAsignada = await Usuario.findByPk(cedula_vendedora);
     if (!vendedoraAsignada || vendedoraAsignada.estado === 0) {
       return res.status(400).json({ message: "No se puede asignar seguimiento a una vendedora inactiva." });
     }
 
-
     const nuevoSeguimiento = await SeguimientoVenta.create({
       id_venta,
       cedula_vendedora,
       fecha_programada: fechaUTC,
+      duracion_minutos: Number.isInteger(duracion_minutos) ? duracion_minutos : 30,
       id_tipo,
       motivo,
       nota,
@@ -198,14 +216,15 @@ const crearSeguimiento = async (req, res) => {
   }
 };
 
+
 //Crear seguimiento con fecha automatica
 const crearSeguimientoConHoraAutomatica = async (req, res) => {
   try {
     const { id_venta, cedula_vendedora, fecha_programada, id_tipo, motivo, nota } = req.body;
 
     if (!fecha_programada || !/^\d{4}-\d{2}-\d{2}$/.test(fecha_programada)) {
-  return res.status(400).json({ message: "Se debe enviar la fecha en formato yyyy-mm-dd." });
-}
+      return res.status(400).json({ message: "Se debe enviar la fecha en formato yyyy-mm-dd." });
+    }
 
     const fechaSinHora = fecha_programada.split("T")[0];
 
@@ -286,7 +305,7 @@ const crearSeguimientoConHoraAutomatica = async (req, res) => {
     res.status(201).json({
       message: `Seguimiento creado exitosamente a las ${formatoFinal}`,
       seguimiento: nuevoSeguimiento,
-      hora_formateada: formatoFinal 
+      hora_formateada: formatoFinal
     });
 
 
@@ -557,6 +576,8 @@ const obtenerAgendaGeneral = async (req, res) => {
 
     const agenda = await SeguimientoVenta.findAll({
       where: { estado: "pendiente", eliminado: 0, ...whereCondition },
+        attributes: ["id_seguimiento", "fecha_programada", "duracion_minutos", "id_tipo", "motivo", "nota", "cedula_vendedora", "estado", "resultado"], // ✅ incluye duracion_minutos
+
       include: [
         {
           model: VentaProspecto,
@@ -636,8 +657,8 @@ const editarSeguimiento = async (req, res) => {
     }
 
     if (fecha_programada) {
-  seguimiento.fecha_programada = parseLocalDatetime(fecha_programada);
-}
+      seguimiento.fecha_programada = parseLocalDatetime(fecha_programada);
+    }
 
 
     seguimiento.id_tipo = id_tipo || seguimiento.id_tipo;

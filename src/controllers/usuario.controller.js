@@ -167,8 +167,6 @@ const obtenerPerfilAdmin = async (req, res) => {
 
 
 
-
-
 module.exports = { obtenerVendedoras, obtenerVendedoraPorCedula, actualizarVendedora,actualizarPerfilAdmin, eliminarVendedora, cambiarEstadoVendedora, obtenerPerfilAdmin};
 
 

@@ -53,6 +53,10 @@ const SeguimientoVenta = sequelize.define("SeguimientoVenta", {
         type: DataTypes.TEXT,
         allowNull: true,
     },
+    duracion_minutos: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    }, 
     estado: {
         type: DataTypes.ENUM("pendiente", "realizado", "cancelado"),
         allowNull: false,

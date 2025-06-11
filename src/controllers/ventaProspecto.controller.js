@@ -69,7 +69,7 @@ const obtenerVentasPorProspecto = async (req, res) => {
 
       include: [
         {
-          model: EstadoProspecto, // ⬅️ AGREGADO
+          model: EstadoProspecto, // AGREGADO
           as: "estado_venta",
           attributes: ["id_estado", "nombre"]
         },
@@ -169,24 +169,22 @@ const obtenerVentaPorId = async (req, res) => {
 // Crear una nueva venta para un prospecto
 const crearVenta = async (req, res) => {
   try {
-    const { id_prospecto, objetivo } = req.body;
-   const estadoReabierto = await EstadoProspecto.findOne({ where: { nombre: "reabierto" } });
-if (!estadoReabierto) {
-  return res.status(500).json({ message: "No se encontró el estado 'reabierto' en la base de datos" });
-}
+    const { id_prospecto, objetivo, monto_proyectado } = req.body;
 
-venta.id_estado = estadoReabierto.id_estado;
-
+    const estadoReabierto = await EstadoProspecto.findOne({ where: { nombre: "nuevo" } });
+    if (!estadoReabierto) {
+      return res.status(500).json({ message: "No se encontró el estado 'nuevo' en la base de datos" });
+    }
 
     const nuevaVenta = await VentaProspecto.create({
       id_prospecto,
       objetivo,
       abierta: 1,
       eliminado: 0,
-      id_estado: estadoNuevo.id_estado,
+      id_estado: estadoReabierto.id_estado,
       monto_proyectado: monto_proyectado || null
-
     });
+
     res.status(201).json({ id_venta: nuevaVenta.id_venta });
   } catch (error) {
     console.error(" Error al crear venta:", error);
@@ -385,7 +383,7 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
           }
         }
 
-        // 🔥 Si no hay pendientes, buscar el último realizado
+        // Si no hay pendientes, buscar el último realizado
         const realizados = seguimientos
           .filter(s => s.estado === "realizado")
           .sort((a, b) => new Date(b.fecha_programada) - new Date(a.fecha_programada));
@@ -394,13 +392,13 @@ const obtenerProspeccionesAgrupadas = async (req, res) => {
           return seguimiento === "realizado";
         }
 
-        // 🔥 Si no hay nada, es sin seguimiento
+        // Si no hay nada, es sin seguimiento
         return seguimiento === "sin_seguimiento";
       });
     }
 
 
-    // 🔥 Siempre después del filtro calcula paginación
+    // Siempre después del filtro calcula paginación
     const total = rows.length;
     const paginados = rows.slice((page - 1) * limit, page * limit);
 

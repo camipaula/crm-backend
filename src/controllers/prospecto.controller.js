@@ -59,7 +59,7 @@ const obtenerProspectos = async (req, res) => {
     };
 
 
-    // 👉 si hay estados en la query, los filtramos desde VentaProspecto
+    // si hay estados en la query, los filtramos desde VentaProspecto
     if (estado) {
       includeVentas.where.id_estado = Array.isArray(estado)
         ? { [Op.in]: estado.map(e => parseInt(e)) }
