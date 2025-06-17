@@ -122,18 +122,18 @@ const obtenerAgendaPorVendedora = async (req, res) => {
         cedula_vendedora,
         estado: "pendiente",
         eliminado: 0
-     },
-  attributes: [
-    "id_seguimiento",
-    "fecha_programada",
-    "duracion_minutos", 
-    "id_tipo",
-    "motivo",
-    "nota",
-    "cedula_vendedora",
-    "estado",
-    "resultado"
-  ],
+      },
+      attributes: [
+        "id_seguimiento",
+        "fecha_programada",
+        "duracion_minutos",
+        "id_tipo",
+        "motivo",
+        "nota",
+        "cedula_vendedora",
+        "estado",
+        "resultado"
+      ],
       include: [
         {
           model: VentaProspecto,
@@ -201,8 +201,8 @@ const crearSeguimiento = async (req, res) => {
       fecha_programada: fechaUTC,
       duracion_minutos: Number.isInteger(duracion_minutos) ? duracion_minutos : 30,
       id_tipo,
-      motivo,
-      nota,
+      motivo: motivo?.toUpperCase(),
+      nota: nota?.toUpperCase(),
       estado: "pendiente",
     });
 
@@ -282,14 +282,15 @@ const crearSeguimientoConHoraAutomatica = async (req, res) => {
     }
 
     const nuevoSeguimiento = await SeguimientoVenta.create({
-      id_venta,
-      cedula_vendedora,
-      fecha_programada: fechaFinal,
-      id_tipo,
-      motivo,
-      nota,
-      estado: "pendiente",
-    });
+  id_venta,
+  cedula_vendedora,
+  fecha_programada: fechaFinal,
+  id_tipo,
+  motivo: motivo?.toUpperCase(),
+  nota: nota?.toUpperCase(),
+  estado: "pendiente",
+});
+
     console.log("HORA LOCAL:", fechaFinal.toString());
     console.log("ISO (UTC):", fechaFinal.toISOString());
 
@@ -342,8 +343,9 @@ const registrarResultadoSeguimiento = async (req, res) => {
     }
 
     // Marcar el seguimiento como realizado
-    seguimiento.resultado = resultado;
-    seguimiento.nota = nota;
+    seguimiento.resultado = resultado?.toUpperCase();
+    seguimiento.nota = nota?.toUpperCase();
+
     seguimiento.estado = "realizado";
     await seguimiento.save();
 
@@ -576,7 +578,7 @@ const obtenerAgendaGeneral = async (req, res) => {
 
     const agenda = await SeguimientoVenta.findAll({
       where: { estado: "pendiente", eliminado: 0, ...whereCondition },
-        attributes: ["id_seguimiento", "fecha_programada", "duracion_minutos", "id_tipo", "motivo", "nota", "cedula_vendedora", "estado", "resultado"], // ✅ incluye duracion_minutos
+      attributes: ["id_seguimiento", "fecha_programada", "duracion_minutos", "id_tipo", "motivo", "nota", "cedula_vendedora", "estado", "resultado"], // ✅ incluye duracion_minutos
 
       include: [
         {

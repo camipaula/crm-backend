@@ -337,6 +337,8 @@ const crearProspecto = async (req, res) => {
 
 // Actualizar un prospecto
 const actualizarProspecto = async (req, res) => {
+  const toUpper = (text) => typeof text === "string" ? text.toUpperCase() : text;
+
   try {
     if (req.body.empleados !== undefined && req.body.empleados < 0) {
       return res.status(400).json({ message: "El número de empleados no puede ser negativo" });
@@ -369,19 +371,19 @@ const actualizarProspecto = async (req, res) => {
     }
 
 
-    prospecto.nombre = nombre ?? prospecto.nombre;
-    prospecto.nombre_contacto = nombre_contacto ?? prospecto.nombre_contacto;
-    prospecto.correo = correo ?? prospecto.correo;
-    prospecto.telefono = telefono ?? prospecto.telefono;
-    prospecto.direccion = direccion ?? prospecto.direccion;
-    prospecto.provincia = provincia ?? prospecto.provincia;
-    prospecto.ciudad = ciudad ?? prospecto.ciudad;
-    prospecto.sector = sector ?? prospecto.sector;
+    prospecto.nombre = nombre ? toUpper(nombre) : prospecto.nombre;
+    prospecto.nombre_contacto = nombre_contacto ? toUpper(nombre_contacto) : prospecto.nombre_contacto;
+    prospecto.correo = correo ? toUpper(correo) : prospecto.correo;
+    prospecto.telefono = telefono ? toUpper(telefono) : prospecto.telefono;
+    prospecto.direccion = direccion ? toUpper(direccion) : prospecto.direccion;
+    prospecto.provincia = provincia ? toUpper(provincia) : prospecto.provincia;
+    prospecto.ciudad = ciudad ? toUpper(ciudad) : prospecto.ciudad;
+    prospecto.sector = sector ? toUpper(sector) : prospecto.sector;
+    prospecto.descripcion = descripcion ? toUpper(descripcion) : prospecto.descripcion;
+    prospecto.nota = nota ? toUpper(nota) : prospecto.nota;
+
     prospecto.id_origen = id_origen ?? prospecto.id_origen;
     prospecto.id_categoria = id_categoria ?? prospecto.id_categoria;
-    prospecto.descripcion = descripcion ?? prospecto.descripcion;
-    // Ya no se actualiza el estado desde Prospecto prospecto.id_estado = id_estado ?? prospecto.id_estado;
-    prospecto.nota = nota ?? prospecto.nota;
     prospecto.empleados = req.body.empleados ?? prospecto.empleados;
     prospecto.monto_proyectado = req.body.monto_proyectado ?? prospecto.monto_proyectado;
     prospecto.cedula_vendedora = vendedoraAsignada;
