@@ -195,20 +195,22 @@ const obtenerDashboard = async (req, res) => {
           .filter(s => s.estado === "pendiente")
           .sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada))[0];
 
-        const tipoSeguimiento = siguienteSeguimiento?.tipo_seguimiento?.descripcion || "Sin tipo";
+        const tipoSeguimiento = siguienteSeguimiento?.tipo_seguimiento?.descripcion || "-";
         const fechaSeguimiento = siguienteSeguimiento?.fecha_programada
           ? new Date(siguienteSeguimiento.fecha_programada).toLocaleDateString("es-EC")
-          : "Sin fecha";
+          : "-";
 
         return {
           id_venta: v.id_venta,
           prospecto: prospecto.nombre,
           numero_empleados: prospecto.empleados ?? "No registrado",
           fecha_apertura: new Date(v.created_at),
-          estado: v.estado_venta?.nombre || "Sin estado",
-          motivo: siguienteSeguimiento?.motivo || "Sin motivo",
+          estado: v.estado_venta?.nombre || "-",
+          motivo: siguienteSeguimiento?.motivo || "-",
           proximo_paso: `${tipoSeguimiento} ${fechaSeguimiento}`,
-          vendedora: vendedora
+          vendedora: vendedora,
+          objetivo: v.objetivo,
+      nota: siguienteSeguimiento?.nota || "-",
         };
       });
 
