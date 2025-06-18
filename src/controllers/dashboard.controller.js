@@ -5,6 +5,7 @@ const EstadoProspecto = require("../models/EstadoProspecto.model");
 const Usuario = require("../models/Usuario.model");
 const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const CategoriaProspecto = require("../models/CategoriaProspecto.model");
+const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 
 const estadosInteres = ["En Planeación", "En Atracción"];
 
@@ -42,36 +43,44 @@ const obtenerDashboard = async (req, res) => {
     if (ciudad) filtrosProspecto.ciudad = ciudad;
 
     // Buscar ventas con prospecto y sus relaciones
-   const ventas = await VentaProspecto.findAll({
-  where: filtrosVenta,
-  include: [
-    {
-      model: Prospecto,
-      as: "prospecto",
-      where: filtrosProspecto,
-      required: true,
-      attributes: ["nombre", "empleados"],
+    const ventas = await VentaProspecto.findAll({
+      where: filtrosVenta,
       include: [
-        { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
-{ model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }
+        {
+          model: Prospecto,
+          as: "prospecto",
+          where: filtrosProspecto,
+          required: true,
+          attributes: ["nombre", "empleados"],
+          include: [
+            { model: Usuario, as: "vendedora_prospecto", attributes: ["nombre"] },
+            { model: CategoriaProspecto, as: "categoria_prospecto", attributes: ["nombre"] }
+
+          ]
+        },
+        {
+          model: EstadoProspecto,
+          as: "estado_venta",
+          attributes: ["nombre"]
+        },
+        {
+          model: SeguimientoVenta,
+          as: "seguimientos",
+          where: { eliminado: 0 },
+          required: false,
+          order: [["fecha_programada", "DESC"]],
+          limit: 1,
+          include: [
+            {
+              model: TipoSeguimiento,
+              as: "tipo_seguimiento",
+              attributes: ["descripcion"]
+            }
+          ]
+        }
 
       ]
-    },
-    {
-      model: EstadoProspecto,
-      as: "estado_venta",
-      attributes: ["nombre"]
-    },
-    {
-      model: SeguimientoVenta,
-      as: "seguimientos",
-      where: { eliminado: 0 },
-      required: false,
-      order: [["fecha_programada", "DESC"]],
-      limit: 1 // traer solo el más reciente
-    }
-  ]
-});
+    });
 
 
 
@@ -109,11 +118,11 @@ const obtenerDashboard = async (req, res) => {
         fecha_apertura: creada,
         fecha_cierre: cerrada,
         dias,
-         monto_proyectado: v.monto_proyectado ?? null, 
+        monto_proyectado: v.monto_proyectado ?? null,
         monto: v.monto_cierre || 0,
-numero_empleados: v.prospecto.empleados !== null && v.prospecto.empleados !== undefined
-  ? v.prospecto.empleados
-  : "No registrado",
+        numero_empleados: v.prospecto.empleados !== null && v.prospecto.empleados !== undefined
+          ? v.prospecto.empleados
+          : "No registrado",
       };
     });
 
@@ -128,18 +137,18 @@ numero_empleados: v.prospecto.empleados !== null && v.prospecto.empleados !== un
       : 0;
 
 
-// Agrupar prospectos por categoría
-const resumenCategorias = {};
+    // Agrupar prospectos por categoría
+    const resumenCategorias = {};
 
-ventas.forEach(v => {
-const categoria = v.prospecto?.categoria_prospecto?.nombre || "Sin categoría";
-  resumenCategorias[categoria] = (resumenCategorias[categoria] || 0) + 1;
-});
+    ventas.forEach(v => {
+      const categoria = v.prospecto?.categoria_prospecto?.nombre || "Sin categoría";
+      resumenCategorias[categoria] = (resumenCategorias[categoria] || 0) + 1;
+    });
 
-const graficoCategorias = Object.entries(resumenCategorias).map(([nombre, cantidad]) => ({
-  categoria: nombre,
-  cantidad
-}));
+    const graficoCategorias = Object.entries(resumenCategorias).map(([nombre, cantidad]) => ({
+      categoria: nombre,
+      cantidad
+    }));
 
 
     const graficoVentas = [
@@ -154,41 +163,54 @@ const graficoCategorias = Object.entries(resumenCategorias).map(([nombre, cantid
       resumenEstadosVenta[estado] = (resumenEstadosVenta[estado] || 0) + 1;
     });
 
- const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
-  .map(([estado, cantidad]) => ({
-    estado,
-    cantidad,
-    porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
-  }))
-  .sort((a, b) => a.cantidad - b.cantidad); 
+    const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
+      .map(([estado, cantidad]) => ({
+        estado,
+        cantidad,
+        porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
+      }))
+      .sort((a, b) => a.cantidad - b.cantidad);
 
     // Filtrar prospecciones en competencia
     const tablaCompetencia = ventasPerdidas.map(v => {
-  const ultimoSeguimiento = v.seguimientos?.[0];
+      const ultimoSeguimiento = v.seguimientos?.[0];
 
-  return {
-    id_venta: v.id_venta,
-    prospecto: v.prospecto.nombre,
-    fecha_apertura: new Date(v.created_at),
-    estado: v.estado_venta?.nombre || "Sin estado",
-    ultimo_resultado: ultimoSeguimiento?.resultado || "Sin resultado"
-  };
-});
+      return {
+        id_venta: v.id_venta,
+        prospecto: v.prospecto.nombre,
+        fecha_apertura: new Date(v.created_at),
+        estado: v.estado_venta?.nombre || "Sin estado",
+        ultimo_resultado: ultimoSeguimiento?.resultado || "Sin resultado"
+      };
+    });
 
 
-   const tablaAbiertas = ventas
-  .filter(v => v.abierta === 1)
-  .map(v => {
-    const ultimoSeguimiento = v.seguimientos?.[0];
+    const tablaAbiertas = ventas
+      .filter(v => v.abierta === 1)
+      .map(v => {
+        const prospecto = v.prospecto;
+        const vendedora = prospecto?.vendedora_prospecto?.nombre || "No asignada";
 
-    return {
-      id_venta: v.id_venta,
-      prospecto: v.prospecto.nombre,
-      fecha_apertura: new Date(v.created_at),
-      estado: v.estado_venta?.nombre || "Sin estado",
-      ultimo_resultado: ultimoSeguimiento?.resultado || "Sin resultado"
-    };
-  });
+        const siguienteSeguimiento = (v.seguimientos || [])
+          .filter(s => s.estado === "pendiente")
+          .sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada))[0];
+
+        const tipoSeguimiento = siguienteSeguimiento?.tipo_seguimiento?.descripcion || "Sin tipo";
+        const fechaSeguimiento = siguienteSeguimiento?.fecha_programada
+          ? new Date(siguienteSeguimiento.fecha_programada).toLocaleDateString("es-EC")
+          : "Sin fecha";
+
+        return {
+          id_venta: v.id_venta,
+          prospecto: prospecto.nombre,
+          numero_empleados: prospecto.empleados ?? "No registrado",
+          fecha_apertura: new Date(v.created_at),
+          estado: v.estado_venta?.nombre || "Sin estado",
+          motivo: siguienteSeguimiento?.motivo || "Sin motivo",
+          proximo_paso: `${tipoSeguimiento} ${fechaSeguimiento}`,
+          vendedora: vendedora
+        };
+      });
 
 
 
