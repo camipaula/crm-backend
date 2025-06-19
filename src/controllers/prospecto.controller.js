@@ -28,7 +28,11 @@ const obtenerProspectos = async (req, res) => {
     }
 
     if (sector) whereClause.sector = sector;
-    if (id_categoria) whereClause.id_categoria = id_categoria;
+    if (req.query.sin_categoria === "true") {
+      whereClause.id_categoria = null;
+    } else if (id_categoria) {
+      whereClause.id_categoria = id_categoria;
+    }
     if (fechaInicio && fechaFin) {
       whereClause.created_at = {
         [Op.between]: [new Date(fechaInicio), new Date(`${fechaFin}T23:59:59`)],
@@ -551,6 +555,7 @@ const exportarProspectos = async (req, res) => {
   try {
     const { cedula_ruc, rol } = req.usuario;
     const { cedula_vendedora, estado, fechaInicio, fechaFin, sector } = req.query;
+    const { id_categoria, sin_categoria } = req.query;
 
     const whereClause = { eliminado: 0 };
 
@@ -561,6 +566,12 @@ const exportarProspectos = async (req, res) => {
     }
 
     if (sector) whereClause.sector = sector;
+    if (sin_categoria === "true") {
+      whereClause.id_categoria = null;
+    } else if (id_categoria) {
+      whereClause.id_categoria = id_categoria;
+    }
+
     if (fechaInicio && fechaFin) {
       whereClause.created_at = {
         [Op.between]: [new Date(fechaInicio), new Date(`${fechaFin}T23:59:59`)],

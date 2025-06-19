@@ -163,13 +163,29 @@ const obtenerDashboard = async (req, res) => {
       resumenEstadosVenta[estado] = (resumenEstadosVenta[estado] || 0) + 1;
     });
 
-    const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
-      .map(([estado, cantidad]) => ({
-        estado,
-        cantidad,
-        porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
-      }))
-      .sort((a, b) => a.cantidad - b.cantidad);
+    const ordenFases = [
+  "Nuevo",
+  "En Atracción",
+  "En Planeación",
+  "Cierre",
+  "Competencia",
+  "Reabierto"
+];
+
+const normalizarEstado = (estado) =>
+  ordenFases.find(e => e.toLowerCase() === estado.toLowerCase()) || estado;
+
+const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
+  .map(([estado, cantidad]) => ({
+    estado: normalizarEstado(estado),
+    cantidad,
+    porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
+  }))
+  .sort((a, b) =>
+    ordenFases.indexOf(normalizarEstado(a.estado)) -
+    ordenFases.indexOf(normalizarEstado(b.estado))
+  );
+
 
     // Filtrar prospecciones en competencia
     const tablaCompetencia = ventasPerdidas.map(v => {
