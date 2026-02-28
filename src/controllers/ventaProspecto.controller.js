@@ -4,8 +4,11 @@ const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model");
 const Usuario = require("../models/Usuario.model");
+const { registrarActividad, agregarHistorialProspecto } = require("../utils/audit");
 
 const { Op } = require("sequelize");
+
+const ESTADO_INICIAL_VENTA = "Captación/ensayo";
 
 // Obtener todas las ventas de prospectos con sus seguimientos
 const obtenerVentas = async (req, res) => {
@@ -169,26 +172,49 @@ const obtenerVentaPorId = async (req, res) => {
 // Crear una nueva venta para un prospecto
 const crearVenta = async (req, res) => {
   try {
-    const { id_prospecto, objetivo, monto_proyectado } = req.body;
+    const { id_prospecto, objetivo, monto_proyectado, id_categoria_venta, cedula_vendedora } = req.body;
 
-    const estadoReabierto = await EstadoProspecto.findOne({ where: { nombre: "nuevo" } });
-    if (!estadoReabierto) {
-      return res.status(500).json({ message: "No se encontró el estado 'nuevo' en la base de datos" });
+    if (!id_prospecto) {
+      return res.status(400).json({ message: "Falta id_prospecto." });
     }
+    if (!objetivo || String(objetivo).trim() === "") {
+      return res.status(400).json({ message: "El objetivo es obligatorio." });
+    }
+
+    const estadoInicial = await EstadoProspecto.findOne({ where: { nombre: ESTADO_INICIAL_VENTA } });
+    if (!estadoInicial) {
+      return res.status(500).json({
+        message: `No se encontró el estado '${ESTADO_INICIAL_VENTA}' en la base de datos. Verifica que exista en la tabla estado_prospecto.`,
+      });
+    }
+
+    const prospecto = await Prospecto.findByPk(id_prospecto, { attributes: ["cedula_vendedora"] });
+    if (!prospecto) {
+      return res.status(404).json({ message: "Prospecto no encontrado." });
+    }
+    const vendedoraVenta = cedula_vendedora || prospecto.cedula_vendedora || null;
+    const idCategoriaVenta = id_categoria_venta ? parseInt(id_categoria_venta, 10) : null;
 
     const nuevaVenta = await VentaProspecto.create({
       id_prospecto,
-      objetivo,
+      objetivo: String(objetivo).trim(),
       abierta: 1,
       eliminado: 0,
-      id_estado: estadoReabierto.id_estado,
-      monto_proyectado: monto_proyectado || null
+      id_estado: estadoInicial.id_estado,
+      id_categoria_venta: idCategoriaVenta,
+      cedula_vendedora: vendedoraVenta,
+      monto_proyectado: monto_proyectado != null ? parseFloat(monto_proyectado) : null,
     });
+
+    const cedula = req.usuario?.cedula_ruc;
+    await registrarActividad(cedula, { modulo: "venta", accion: "crear", referencia_id: nuevaVenta.id_venta, descripcion: `Abrió prospección: ${objetivo}` });
+    await agregarHistorialProspecto(parseInt(id_prospecto, 10), cedula, "evento", `Abrió prospección: ${objetivo}`);
 
     res.status(201).json({ id_venta: nuevaVenta.id_venta });
   } catch (error) {
     console.error(" Error al crear venta:", error);
-    res.status(500).json({ message: "Error al crear venta", error });
+    const msg = error.message || "Error al crear venta";
+    return res.status(500).json({ message: msg, error: error.message });
   }
 };
 
@@ -206,6 +232,12 @@ const cerrarVenta = async (req, res) => {
     venta.abierta = 0;
     venta.fecha_cierre = new Date();
     await venta.save();
+
+    const cedula = req.usuario?.cedula_ruc;
+    await registrarActividad(cedula, { modulo: "venta", accion: "cerrar venta", referencia_id: venta.id_venta, descripcion: "Cerro la venta" });
+    if (venta.id_prospecto) {
+      await agregarHistorialProspecto(venta.id_prospecto, cedula, "evento", "Cerro la prospección.");
+    }
 
     res.json({ message: "Venta cerrada exitosamente" });
   } catch (error) {
@@ -231,6 +263,8 @@ const editarObjetivoVenta = async (req, res) => {
     }
 
     await venta.save();
+
+    await registrarActividad(req.usuario?.cedula_ruc, { modulo: "venta", accion: "editar objetivo", referencia_id: venta.id_venta, descripcion: `Editó objetivo: ${venta.objetivo}` });
 
     res.json({ message: "Objetivo y monto proyectado actualizados", venta });
   } catch (error) {
@@ -286,6 +320,8 @@ const eliminarVenta = async (req, res) => {
       seguimiento.eliminado = 1;
       await seguimiento.save();
     }
+
+    await registrarActividad(req.usuario?.cedula_ruc, { modulo: "venta", accion: "eliminar", referencia_id: venta.id_venta, descripcion: "Eliminó la venta" });
 
     res.json({ message: "Venta y seguimientos eliminados correctamente" });
   } catch (error) {
@@ -460,14 +496,14 @@ const reabrirVenta = async (req, res) => {
       return res.status(400).json({ message: "Solo se pueden reabrir ventas en estado 'Competencia'" });
     }
 
-    const estadoReabierto = await EstadoProspecto.findOne({ where: { nombre: "reabierto" } });
-    if (!estadoReabierto) {
-      return res.status(500).json({ message: "No se encontró el estado 'reabierto' en la base de datos" });
+    const estadoInicial = await EstadoProspecto.findOne({ where: { nombre: ESTADO_INICIAL_VENTA } });
+    if (!estadoInicial) {
+      return res.status(500).json({ message: `No se encontró el estado '${ESTADO_INICIAL_VENTA}' en la base de datos` });
     }
 
     venta.abierta = 1;
     venta.fecha_cierre = null;
-    venta.id_estado = estadoReabierto.id_estado;
+    venta.id_estado = estadoInicial.id_estado;
     await venta.save();
 
     await SeguimientoVenta.create({
@@ -480,6 +516,12 @@ const reabrirVenta = async (req, res) => {
       nota,
       estado: "realizado",
     });
+
+    const cedula = req.usuario?.cedula_ruc;
+    await registrarActividad(cedula, { modulo: "venta", accion: "reabrir venta", referencia_id: venta.id_venta, descripcion: "Reabrió la venta" });
+    if (venta.id_prospecto) {
+      await agregarHistorialProspecto(venta.id_prospecto, cedula, "evento", "Reabrió la prospección.");
+    }
 
     res.json({ message: "Venta reabierta exitosamente" });
   } catch (error) {

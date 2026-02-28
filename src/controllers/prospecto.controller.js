@@ -7,6 +7,7 @@ const CategoriaProspecto = require("../models/CategoriaProspecto.model");
 const VentaProspecto = require("../models/VentaProspecto.model");
 const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model");
+const { registrarActividad, agregarHistorialProspecto } = require("../utils/audit");
 
 // Obtener prospectos con filtros
 const obtenerProspectos = async (req, res) => {
@@ -284,10 +285,10 @@ const crearProspecto = async (req, res) => {
 
 
 
-    // Obtener estado "nuevo"
-    const estadoNuevo = await EstadoProspecto.findOne({ where: { nombre: "nuevo" } });
-    if (!estadoNuevo) {
-      return res.status(500).json({ message: "Estado 'nuevo' no está registrado en la base de datos." });
+    // Obtener estado inicial "Captación/ensayo"
+    const estadoInicial = await EstadoProspecto.findOne({ where: { nombre: "Captación/ensayo" } });
+    if (!estadoInicial) {
+      return res.status(500).json({ message: "Estado 'Captación/ensayo' no está registrado en la base de datos." });
     }
 
     // Crear prospecto
@@ -317,15 +318,22 @@ const crearProspecto = async (req, res) => {
       return res.status(400).json({ message: "Debes proporcionar un objetivo válido para la prospección." });
     }
 
+    const id_categoria_venta = req.body.id_categoria_venta ? parseInt(req.body.id_categoria_venta, 10) : null;
     const nuevaVenta = await VentaProspecto.create({
       id_prospecto: nuevoProspecto.id_prospecto,
       objetivo: req.body.objetivo,
-      id_estado: estadoNuevo.id_estado,
+      id_estado: estadoInicial.id_estado,
+      id_categoria_venta: id_categoria_venta || null,
+      cedula_vendedora: asignarVendedora,
       monto_proyectado: monto_proyectado || null,
       abierta: 1,
       eliminado: 0,
     });
 
+    const cedula = req.usuario?.cedula_ruc;
+    const msgHistorial = `Creó el prospecto ${nuevoProspecto.nombre} y abrió prospección: ${req.body.objetivo}`;
+    await registrarActividad(cedula, { modulo: "prospecto", accion: "crear", referencia_id: nuevoProspecto.id_prospecto, descripcion: msgHistorial });
+    await agregarHistorialProspecto(nuevoProspecto.id_prospecto, cedula, "evento", msgHistorial);
 
     res.status(201).json({
       message: "Prospecto y prospección creados exitosamente",
@@ -399,6 +407,8 @@ const actualizarProspecto = async (req, res) => {
 
     await prospecto.save();
 
+    await registrarActividad(req.usuario?.cedula_ruc, { modulo: "prospecto", accion: "editar", referencia_id: parseInt(id_prospecto, 10), descripcion: `Actualizó el prospecto ${prospecto.nombre}` });
+
     res.json({ message: "Prospecto actualizado correctamente", prospecto });
   } catch (error) {
     console.error("Error al actualizar prospecto:", error);
@@ -432,7 +442,7 @@ const eliminarProspecto = async (req, res) => {
       return res.status(404).json({ message: "Prospecto no encontrado o ya fue eliminado" });
     }
 
-    // Solo permitir eliminar si el prospecto está en estado 'nuevo'
+    // Solo permitir eliminar si no tiene prospecciones abiertas
     if (prospecto.ventas.some(v => v.abierta === 1 && v.eliminado === 0)) {
       return res.status(400).json({ message: "No se puede eliminar el prospecto. Tiene prospecciones activas." });
     }
@@ -454,6 +464,8 @@ const eliminarProspecto = async (req, res) => {
         await seguimiento.save();
       }
     }
+
+    await registrarActividad(req.usuario?.cedula_ruc, { modulo: "prospecto", accion: "eliminar", referencia_id: parseInt(id_prospecto, 10), descripcion: `Eliminó el prospecto ${prospecto.nombre}. Razón: ${razon}` });
 
     res.json({ message: "Prospecto eliminado lógicamente con razón registrada." });
   } catch (error) {
@@ -692,7 +704,7 @@ const exportarProspectos = async (req, res) => {
             objetivo: venta.objetivo || "Sin objetivo",
             monto_proyectado: venta.monto_proyectado ?? "No definido",
             estado:
-              estadoVenta?.toLowerCase() === "cierre" && montoCierre
+              estadoVenta?.toLowerCase() === "cierre de venta" && montoCierre
                 ? `Ganado ($${parseFloat(montoCierre).toFixed(2)})`
                 : estadoVenta || "Sin estado",
             vendedora: p.vendedora_prospecto?.nombre || "No asignada",

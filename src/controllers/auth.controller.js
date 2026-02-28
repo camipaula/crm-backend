@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Usuario = require("../models/Usuario.model");
+const { registrarLogAcceso } = require("../utils/audit");
 
 
 function validarCedulaEcuatoriana(cedula) {
@@ -123,6 +124,8 @@ const login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "12h" }
     );
+
+    await registrarLogAcceso(usuario.cedula_ruc, req);
 
     res.status(200).json({
       message: "Login exitoso",

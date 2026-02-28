@@ -11,14 +11,15 @@ const transporter = nodemailer.createTransport({
 });
 
 async function enviarCorreoCierre({ prospecto, estado, monto }) {
-  const adminEmail = 'cvegatandazo@gmail.com, santosdist@gmail.com';
+  const adminEmail = 'cvegatandazo@gmail.com';
+  //, santosdist@gmail.com';
 
   const asunto = `Prospecto ${estado.toUpperCase()}: ${prospecto.nombre}`;
   const mensaje = `
     Hola 👋,
 
     El prospecto "${prospecto.nombre}" ha sido marcado como "${estado.toUpperCase()}".
-    ${estado === 'Cierre' ? `Monto de cierre: $${monto}` : ''}
+    ${estado === 'Cierre de venta' ? `Monto de cierre: $${monto}` : ''}
 
     Revisa el CRM para más detalles.
 

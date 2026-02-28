@@ -15,8 +15,10 @@ const {
   exportarProspectos,
   obtenerEstadosProspecto,
   obtenerCiudades,
-obtenerProvincias
+  obtenerProvincias,
 } = require("../controllers/prospecto.controller");
+const { listarDocumentosPorProspecto } = require("../controllers/documento.controller");
+const { listarHistorial, agregarNota } = require("../controllers/historial.controller");
 
 const verificarToken = require("../middlewares/authMiddleware");
 
@@ -46,6 +48,13 @@ router.get("/categoria/:id_categoria", obtenerProspectosPorCategoria);
 
 // Obtener prospectos de una vendedora
 router.get("/vendedora/:cedula_vendedora", verificarToken, obtenerProspectosPorVendedora);
+
+// Historial del prospecto (chat / eventos + notas)
+router.get("/:id_prospecto/historial", verificarToken, listarHistorial);
+router.post("/:id_prospecto/historial", verificarToken, soloLectura, agregarNota);
+
+// Documentos de un prospecto
+router.get("/:id_prospecto/documentos", verificarToken, listarDocumentosPorProspecto);
 
 // Obtener un prospecto por ID
 router.get("/:id_prospecto", verificarToken, obtenerProspectoPorId);

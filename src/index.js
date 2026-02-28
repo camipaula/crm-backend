@@ -10,7 +10,10 @@ const usuarioRoutes = require("./routes/usuario.routes");
 const ventaRoutes = require("./routes/venta.routes"); 
 const seguimientoRoutes = require("./routes/seguimiento.routes"); 
 const categoriasRoutes = require("./routes/categorias");
+const categoriasVentaRoutes = require("./routes/categoriasVenta.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
+const documentoRoutes = require("./routes/documento.routes");
+const logsRoutes = require("./routes/logs.routes");
 
 // Cargar variables de entorno
 dotenv.config();
@@ -22,13 +25,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Archivos subidos (para descargar documentos)
+app.use("/api/uploads", express.static("uploads"));
+
 // Definir rutas
 app.use("/api/auth", authRoutes);
 app.use("/api/prospectos", prospectoRoutes);
 app.use("/api/usuarios", usuarioRoutes);
-app.use("/api/ventas", ventaRoutes); 
-app.use("/api/seguimientos", seguimientoRoutes); 
+app.use("/api/ventas", ventaRoutes);
+app.use("/api/seguimientos", seguimientoRoutes);
 app.use("/api/categorias", categoriasRoutes);
+app.use("/api/categorias-venta", categoriasVentaRoutes);
+app.use("/api/documentos", documentoRoutes);
+app.use("/api/logs", logsRoutes);
 // Agregar la ruta del dashboard
 app.use("/api/dashboard", dashboardRoutes);
 
@@ -46,7 +55,8 @@ app.listen(PORT, async () => {
   try {
     await sequelize.authenticate();
     console.log(" Conexión a la base de datos establecida.");
-    
+    await sequelize.sync({ alter: true });
+    console.log(" Base de datos sincronizada (tablas actualizadas).");
   } catch (error) {
     console.error(" Error al conectar la base de datos:", error);
   }

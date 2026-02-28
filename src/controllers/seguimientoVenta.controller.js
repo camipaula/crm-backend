@@ -4,6 +4,7 @@ const VentaProspecto = require("../models/VentaProspecto.model");
 const Usuario = require("../models/Usuario.model");
 const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 const EstadoProspecto = require("../models/EstadoProspecto.model");
+const { registrarActividad, agregarHistorialProspecto } = require("../utils/audit");
 const { Op } = require("sequelize");
 const ExcelJS = require("exceljs");
 const { enviarCorreoCierre } = require("../utils/correoUtils");
@@ -206,6 +207,14 @@ const crearSeguimiento = async (req, res) => {
       estado: "pendiente",
     });
 
+    const cedula = req.usuario?.cedula_ruc;
+    const venta = await VentaProspecto.findByPk(id_venta, { attributes: ["id_prospecto"] });
+    const msg = motivo ? `Registró seguimiento: ${motivo}` : "Registró un seguimiento.";
+    await registrarActividad(cedula, { modulo: "seguimiento", accion: "crear", referencia_id: nuevoSeguimiento.id_seguimiento, descripcion: msg });
+    if (venta?.id_prospecto) {
+      await agregarHistorialProspecto(venta.id_prospecto, cedula, "evento", msg);
+    }
+
     res.status(201).json({
       message: "Seguimiento creado exitosamente",
       seguimiento: nuevoSeguimiento,
@@ -282,14 +291,22 @@ const crearSeguimientoConHoraAutomatica = async (req, res) => {
     }
 
     const nuevoSeguimiento = await SeguimientoVenta.create({
-  id_venta,
-  cedula_vendedora,
-  fecha_programada: fechaFinal,
-  id_tipo,
-  motivo: motivo?.toUpperCase(),
-  nota: nota?.toUpperCase(),
-  estado: "pendiente",
-});
+      id_venta,
+      cedula_vendedora,
+      fecha_programada: fechaFinal,
+      id_tipo,
+      motivo: motivo?.toUpperCase(),
+      nota: nota?.toUpperCase(),
+      estado: "pendiente",
+    });
+
+    const cedula = req.usuario?.cedula_ruc;
+    const venta = await VentaProspecto.findByPk(id_venta, { attributes: ["id_prospecto"] });
+    const msg = motivo ? `Registró seguimiento: ${motivo}` : "Registró un seguimiento.";
+    await registrarActividad(cedula, { modulo: "seguimiento", accion: "crear", referencia_id: nuevoSeguimiento.id_seguimiento, descripcion: msg });
+    if (venta?.id_prospecto) {
+      await agregarHistorialProspecto(venta.id_prospecto, cedula, "evento", msg);
+    }
 
     console.log("HORA LOCAL:", fechaFinal.toString());
     console.log("ISO (UTC):", fechaFinal.toISOString());
@@ -362,8 +379,8 @@ const registrarResultadoSeguimiento = async (req, res) => {
     // Asignar el estado a la venta
     venta.id_estado = nuevoEstado.id_estado;
 
-    // Si el estado es Cierre o Competencia, cerrar la venta
-    if (estado === "Cierre") {
+    // Si el estado es Cierre de venta o Competencia, cerrar la venta
+    if (estado === "Cierre de venta") {
       if (!monto_cierre) {
         return res.status(400).json({ message: "Debes enviar el monto de cierre para una venta ganada." });
       }
@@ -386,8 +403,8 @@ const registrarResultadoSeguimiento = async (req, res) => {
     });
 
     // Enviar correo si es necesario (sin bloquear al usuario)
-    if (estado === "Cierre") {
-      enviarCorreoCierre({ prospecto, estado: "Cierre", monto: monto_cierre }).catch(console.error);
+    if (estado === "Cierre de venta") {
+      enviarCorreoCierre({ prospecto, estado: "Cierre de venta", monto: monto_cierre }).catch(console.error);
     } else if (estado === "Competencia") {
       enviarCorreoCierre({ prospecto, estado: "Competencia", monto: 0 }).catch(console.error);
     }

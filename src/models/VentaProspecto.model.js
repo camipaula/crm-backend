@@ -2,6 +2,8 @@ const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 const Prospecto = require("./Prospecto.model");
 const EstadoProspecto = require("./EstadoProspecto.model");
+const CategoriaVenta = require("./CategoriaVenta.model");
+const Usuario = require("./Usuario.model");
 
 const VentaProspecto = sequelize.define("VentaProspecto", {
   id_venta: {
@@ -45,6 +47,25 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
     references: {
       model: EstadoProspecto,
       key: "id_estado",
+    },
+    onDelete: "SET NULL",
+  },
+  id_categoria_venta: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: CategoriaVenta,
+      key: "id_categoria_venta",
+    },
+    onDelete: "SET NULL",
+    onUpdate: "CASCADE",
+  },
+  cedula_vendedora: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    references: {
+      model: Usuario,
+      key: "cedula_ruc",
     },
     onDelete: "SET NULL",
   },

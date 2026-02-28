@@ -5,9 +5,17 @@ const EstadoProspecto = require("../models/EstadoProspecto.model");
 const Usuario = require("../models/Usuario.model");
 const SeguimientoVenta = require("../models/SeguimientoVenta.model");
 const CategoriaProspecto = require("../models/CategoriaProspecto.model");
+const OrigenProspecto = require("../models/OrigenProspecto.model");
 const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 
-const estadosInteres = ["En Planeación", "En Atracción"];
+const ESTADOS_CIERRE = "Cierre de venta";
+const ORDEN_ESTADOS = [
+  "Captación/ensayo",
+  "Citas",
+  "Cotizaciones",
+  "Seguimiento",
+  "Cierre de venta",
+];
 
 const obtenerDashboard = async (req, res) => {
   try {
@@ -18,22 +26,19 @@ const obtenerDashboard = async (req, res) => {
       id_categoria,
       id_origen,
       sector,
-      ciudad
+      ciudad,
     } = req.query;
 
     const filtrosVenta = { eliminado: 0 };
     const filtrosProspecto = { eliminado: 0 };
 
-    // Validar fechas antes de usarlas
     if (fecha_inicio && fecha_fin) {
       const fechaInicioDate = new Date(fecha_inicio);
       const fechaFinDate = new Date(fecha_fin);
       fechaFinDate.setHours(23, 59, 59, 999);
-
       filtrosVenta.created_at = {
-        [Op.between]: [fechaInicioDate, fechaFinDate]
+        [Op.between]: [fechaInicioDate, fechaFinDate],
       };
-
     }
 
     if (cedula_vendedora) filtrosProspecto.cedula_vendedora = cedula_vendedora;
@@ -41,6 +46,23 @@ const obtenerDashboard = async (req, res) => {
     if (id_origen) filtrosProspecto.id_origen = id_origen;
     if (sector) filtrosProspecto.sector = sector;
     if (ciudad) filtrosProspecto.ciudad = ciudad;
+
+    // Opciones de filtros para mostrar bien a la vista en el front
+    const [vendedoras, categorias, origenes] = await Promise.all([
+      Usuario.findAll({
+        where: { rol: "vendedora", estado: 1 },
+        attributes: ["cedula_ruc", "nombre"],
+        order: [["nombre", "ASC"]],
+      }),
+      CategoriaProspecto.findAll({
+        attributes: ["id_categoria", "nombre"],
+        order: [["nombre", "ASC"]],
+      }),
+      OrigenProspecto.findAll({
+        attributes: ["id_origen", "descripcion"],
+        order: [["id_origen", "ASC"]],
+      }),
+    ]);
 
     // Buscar ventas con prospecto y sus relaciones
     const ventas = await VentaProspecto.findAll({
@@ -85,18 +107,14 @@ const obtenerDashboard = async (req, res) => {
 
 
     const totalVentas = ventas.length;
+    const ventasGanadas = ventas.filter(v => v.estado_venta?.nombre === ESTADOS_CIERRE);
+    const ventasPerdidas = ventas.filter(v => v.estado_venta?.nombre === "Competencia");
     const ventasCerradas = ventas.filter(v => v.abierta === 0);
 
-    const ventasGanadas = ventasCerradas.filter(v =>
-      v.estado_venta?.nombre === "Cierre"
-    );
-
-    const ventasPerdidas = ventas.filter(v =>
-      v.estado_venta?.nombre === "Competencia"
-    );
-
-
-    const totalVentasAbiertas = ventas.filter(v => v.abierta === 1).length;
+    // Abiertas = todas las que NO están en Cierre de venta (aún en pipeline)
+    const totalVentasAbiertas = ventas.filter(
+      v => v.estado_venta?.nombre !== ESTADOS_CIERRE
+    ).length;
 
     const porcentajeGanadas = totalVentas > 0
       ? (ventasGanadas.length / totalVentas) * 100
@@ -152,9 +170,9 @@ const obtenerDashboard = async (req, res) => {
 
 
     const graficoVentas = [
-      { estado: "Abiertas", cantidad: totalVentasAbiertas },
-      { estado: "Ganadas", cantidad: ventasGanadas.length },
-      { estado: "Perdidas", cantidad: ventasPerdidas.length }
+      { estado: "Abiertas", cantidad: totalVentasAbiertas, descripcion: "En pipeline (no cerradas)" },
+      { estado: "Ganadas", cantidad: ventasGanadas.length, descripcion: "Cierre de venta" },
+      { estado: "Perdidas", cantidad: ventasPerdidas.length, descripcion: "Competencia" },
     ];
 
     const resumenEstadosVenta = {};
@@ -163,28 +181,20 @@ const obtenerDashboard = async (req, res) => {
       resumenEstadosVenta[estado] = (resumenEstadosVenta[estado] || 0) + 1;
     });
 
-    const ordenFases = [
-  "Nuevo",
-  "En Atracción",
-  "En Planeación",
-  "Cierre",
-  "Competencia",
-  "Reabierto"
-];
+    const normalizarEstado = (estado) =>
+      ORDEN_ESTADOS.find(e => e.toLowerCase() === (estado || "").toLowerCase()) || estado;
 
-const normalizarEstado = (estado) =>
-  ordenFases.find(e => e.toLowerCase() === estado.toLowerCase()) || estado;
-
-const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
-  .map(([estado, cantidad]) => ({
-    estado: normalizarEstado(estado),
-    cantidad,
-    porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0
-  }))
-  .sort((a, b) =>
-    ordenFases.indexOf(normalizarEstado(a.estado)) -
-    ordenFases.indexOf(normalizarEstado(b.estado))
-  );
+    const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
+      .map(([estado, cantidad]) => ({
+        estado: normalizarEstado(estado),
+        cantidad,
+        porcentaje: totalVentas > 0 ? ((cantidad / totalVentas) * 100).toFixed(2) : 0,
+      }))
+      .sort(
+        (a, b) =>
+          ORDEN_ESTADOS.indexOf(normalizarEstado(a.estado)) -
+          ORDEN_ESTADOS.indexOf(normalizarEstado(b.estado))
+      );
 
 
     // Filtrar prospecciones en competencia
@@ -202,7 +212,7 @@ const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
 
 
     const tablaAbiertas = ventas
-      .filter(v => v.abierta === 1)
+      .filter(v => v.estado_venta?.nombre !== ESTADOS_CIERRE)
       .map(v => {
         const prospecto = v.prospecto;
         const vendedora = prospecto?.vendedora_prospecto?.nombre || "No asignada";
@@ -240,7 +250,6 @@ const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
       totalVentasCerradas: ventasCerradas.length,
       porcentajeGanadas,
       porcentajePerdidas,
-
       promedioDiasCierre,
       promedioMontoCierre,
       tablaCierres,
@@ -249,7 +258,20 @@ const graficoEstadosProspecto = Object.entries(resumenEstadosVenta)
       graficoVentas,
       graficoEstadosProspecto,
       graficoCategorias,
-
+      filtrosAplicados: {
+        fecha_inicio: fecha_inicio || null,
+        fecha_fin: fecha_fin || null,
+        cedula_vendedora: cedula_vendedora || null,
+        id_categoria: id_categoria || null,
+        id_origen: id_origen || null,
+        sector: sector || null,
+        ciudad: ciudad || null,
+      },
+      filtrosDisponibles: {
+        vendedoras: vendedoras.map((u) => ({ cedula_ruc: u.cedula_ruc, nombre: u.nombre })),
+        categorias: categorias.map((c) => ({ id_categoria: c.id_categoria, nombre: c.nombre })),
+        origenes: origenes.map((o) => ({ id_origen: o.id_origen, descripcion: o.descripcion })),
+      },
     });
 
 
