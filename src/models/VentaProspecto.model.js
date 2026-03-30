@@ -78,6 +78,20 @@ const VentaProspecto = sequelize.define("VentaProspecto", {
     type: DataTypes.TINYINT,
     defaultValue: 0
   }
+,
+// nuevos estados 
+monto_proyectado: {
+  type: DataTypes.DECIMAL(10, 2),
+  allowNull: true,
+},
+motivo_declinacion: { // NUEVO
+  type: DataTypes.STRING(100),
+  allowNull: true,
+},
+observacion_declinacion: { // NUEVO
+  type: DataTypes.TEXT,
+  allowNull: true,
+}
 }, {
   tableName: "venta_prospecto",
   timestamps: true,

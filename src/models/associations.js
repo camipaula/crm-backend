@@ -11,6 +11,8 @@ const Documento = require("./Documento.model");
 const LogAcceso = require("./LogAcceso.model");
 const LogActividad = require("./LogActividad.model");
 const ProspectoHistorial = require("./ProspectoHistorial.model");
+const ForecastMensual = require("./ForecastMensual.model");
+const VentaRealMensual = require("./VentaRealMensual.model");
 
 // Relación Usuario - Prospecto (1 a muchos)
 Usuario.hasMany(Prospecto, { foreignKey: "cedula_vendedora", as: "prospectos_vendedora", onDelete: "CASCADE" });
@@ -73,6 +75,20 @@ ProspectoHistorial.belongsTo(Prospecto, { foreignKey: "id_prospecto", as: "prosp
 Usuario.hasMany(ProspectoHistorial, { foreignKey: "cedula_usuario", as: "historiales", onDelete: "CASCADE" });
 ProspectoHistorial.belongsTo(Usuario, { foreignKey: "cedula_usuario", as: "usuario" });
 
+// Forecast mensual (admin): vendedora + categoría venta por año/mes
+Usuario.hasMany(ForecastMensual, { foreignKey: "cedula_vendedora", as: "forecasts", onDelete: "CASCADE" });
+ForecastMensual.belongsTo(Usuario, { foreignKey: "cedula_vendedora", as: "vendedora" });
+CategoriaVenta.hasMany(ForecastMensual, { foreignKey: "id_categoria_venta", as: "forecasts", onDelete: "CASCADE" });
+ForecastMensual.belongsTo(CategoriaVenta, { foreignKey: "id_categoria_venta", as: "categoria_venta" });
+
+// Ventas reales mensuales: id_usuario (INT) debe referenciar usuario.id_usuario (INT).
+// Sequelize con PK=cedula_ruc genera FK a cedula_ruc (incompatible). No creamos FK por asociación;
+// la columna id_usuario se crea por el modelo. Si quieres FK en BD: añádela a mano a usuario(id_usuario).
+Usuario.hasMany(VentaRealMensual, { foreignKey: "id_usuario", targetKey: "id_usuario", as: "ventas_reales_mensuales", constraints: false });
+VentaRealMensual.belongsTo(Usuario, { foreignKey: "id_usuario", targetKey: "id_usuario", as: "usuario", constraints: false });
+CategoriaVenta.hasMany(VentaRealMensual, { foreignKey: "id_categoria_venta", as: "ventas_reales_mensuales", onDelete: "CASCADE" });
+VentaRealMensual.belongsTo(CategoriaVenta, { foreignKey: "id_categoria_venta", as: "categoria_venta" });
+
 module.exports = {
   Usuario,
   Prospecto,
@@ -86,4 +102,6 @@ module.exports = {
   LogAcceso,
   LogActividad,
   ProspectoHistorial,
+  ForecastMensual,
+  VentaRealMensual,
 };

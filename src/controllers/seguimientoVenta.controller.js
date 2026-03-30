@@ -114,15 +114,16 @@ const obtenerSeguimientosPorVendedora = async (req, res) => {
 
 
 // Obtener la agenda de una vendedora (para el calendario en frontend)
+// Obtener la agenda de una vendedora (para el calendario en frontend)
 const obtenerAgendaPorVendedora = async (req, res) => {
   try {
     const { cedula_vendedora } = req.params;
 
     const agenda = await SeguimientoVenta.findAll({
       where: {
-        cedula_vendedora,
         estado: "pendiente",
-        eliminado: 0
+        eliminado: 0,
+        "$venta.prospecto.cedula_vendedora$": cedula_vendedora // 👈 FILTRO DINÁMICO
       },
       attributes: [
         "id_seguimiento",
@@ -131,7 +132,6 @@ const obtenerAgendaPorVendedora = async (req, res) => {
         "id_tipo",
         "motivo",
         "nota",
-        "cedula_vendedora",
         "estado",
         "resultado"
       ],
@@ -144,7 +144,7 @@ const obtenerAgendaPorVendedora = async (req, res) => {
             {
               model: Prospecto,
               as: "prospecto",
-              attributes: ["nombre"]
+              attributes: ["nombre", "cedula_vendedora"]
             },
             {
               model: EstadoProspecto,
@@ -165,6 +165,60 @@ const obtenerAgendaPorVendedora = async (req, res) => {
   }
 };
 
+
+// Obtener la agenda general (Para la administradora)
+const obtenerAgendaGeneral = async (req, res) => {
+  try {
+    const { cedula_vendedora } = req.query;
+
+    let whereCondition = { estado: "pendiente", eliminado: 0 };
+    if (cedula_vendedora) {
+      whereCondition["$venta.prospecto.cedula_vendedora$"] = cedula_vendedora; // 👈 FILTRO DINÁMICO
+    }
+
+    const agenda = await SeguimientoVenta.findAll({
+      where: whereCondition,
+      attributes: ["id_seguimiento", "fecha_programada", "duracion_minutos", "id_tipo", "motivo", "nota", "estado", "resultado"], 
+      include: [
+        {
+          model: VentaProspecto,
+          as: "venta",
+          attributes: ["objetivo"],
+          include: [
+            {
+              model: Prospecto,
+              as: "prospecto",
+              attributes: ["nombre", "cedula_vendedora"],
+              include: [
+                {
+                  model: Usuario,
+                  as: "vendedora_prospecto", // 👈 TRAEMOS EL NOMBRE DE LA VENDEDORA ACTUAL
+                  attributes: ["nombre"]
+                }
+              ]
+            },
+            {
+              model: EstadoProspecto,
+              as: "estado_venta",
+              attributes: ["nombre"]
+            }
+          ],
+        },
+        {
+          model: TipoSeguimiento,
+          as: "tipo_seguimiento",
+          attributes: ["descripcion"],
+        },
+      ],
+      order: [["fecha_programada", "ASC"]],
+    });
+
+    res.json(agenda);
+  } catch (error) {
+    console.error("Error al obtener agenda general:", error);
+    res.status(500).json({ message: "Error al obtener agenda", error });
+  }
+};
 
 
 
@@ -377,19 +431,46 @@ const registrarResultadoSeguimiento = async (req, res) => {
     }
 
     // Asignar el estado a la venta
+    // Asignar el estado a la venta
     venta.id_estado = nuevoEstado.id_estado;
 
-    // Si el estado es Cierre de venta o Competencia, cerrar la venta
+    // LÓGICA DE ESTADOS FINALES
     if (estado === "Cierre de venta") {
-      if (!monto_cierre) {
-        return res.status(400).json({ message: "Debes enviar el monto de cierre para una venta ganada." });
-      }
+      if (!monto_cierre) return res.status(400).json({ message: "Debes enviar el monto de cierre." });
       venta.abierta = 0;
       venta.fecha_cierre = new Date();
       venta.monto_cierre = monto_cierre;
+      
     } else if (estado === "Competencia") {
       venta.abierta = 0;
       venta.fecha_cierre = new Date();
+      
+    } else if (estado === "Prospección declinada") {
+      // 1. Validar campos obligatorios
+      if (!req.body.motivo_declinacion || !req.body.observacion_declinacion) {
+        return res.status(400).json({ message: "El motivo y la observación son obligatorios para declinar." });
+      }
+      
+      // 2. Cerrar la venta y guardar motivos
+      venta.abierta = 0;
+      venta.fecha_cierre = new Date();
+      venta.motivo_declinacion = req.body.motivo_declinacion;
+      venta.observacion_declinacion = req.body.observacion_declinacion;
+
+      // 3. Crear el seguimiento a 6 meses automáticamente
+      const fechaSeisMeses = new Date();
+      fechaSeisMeses.setMonth(fechaSeisMeses.getMonth() + 6);
+
+      await SeguimientoVenta.create({
+        id_venta: venta.id_venta,
+        cedula_vendedora: seguimiento.cedula_vendedora, // Mantiene a la misma vendedora
+        fecha_programada: fechaSeisMeses,
+        id_tipo: 1, //ID corresponda a "Llamada" o "Seguimiento" 
+        motivo: "Reintento - Lead declinado hace 6 meses",
+        nota: `Motivo de declinación anterior: ${req.body.motivo_declinacion} | Obs: ${req.body.observacion_declinacion}`,
+        estado: "pendiente",
+        duracion_minutos: 30
+      });
     }
 
     await venta.save();
@@ -584,58 +665,6 @@ const exportarSeguimientos = async (req, res) => {
   }
 };
 
-const obtenerAgendaGeneral = async (req, res) => {
-  try {
-    const { cedula_vendedora } = req.query;
-
-    let whereCondition = {};
-    if (cedula_vendedora) {
-      whereCondition.cedula_vendedora = cedula_vendedora;
-    }
-
-    const agenda = await SeguimientoVenta.findAll({
-      where: { estado: "pendiente", eliminado: 0, ...whereCondition },
-      attributes: ["id_seguimiento", "fecha_programada", "duracion_minutos", "id_tipo", "motivo", "nota", "cedula_vendedora", "estado", "resultado"], // ✅ incluye duracion_minutos
-
-      include: [
-        {
-          model: VentaProspecto,
-          as: "venta",
-          attributes: ["objetivo"],
-          include: [
-            {
-              model: Prospecto,
-              as: "prospecto",
-              attributes: ["nombre"]
-            },
-            {
-              model: EstadoProspecto,
-              as: "estado_venta",
-              attributes: ["nombre"]
-            }
-          ],
-        },
-
-        {
-          model: Usuario,
-          as: "vendedora_seguimiento",
-          attributes: ["nombre", "cedula_ruc"],
-        },
-        {
-          model: TipoSeguimiento,
-          as: "tipo_seguimiento",
-          attributes: ["descripcion"],
-        },
-      ],
-      order: [["fecha_programada", "ASC"]],
-    });
-
-    res.json(agenda);
-  } catch (error) {
-    console.error("Error al obtener agenda general:", error);
-    res.status(500).json({ message: "Error al obtener agenda", error });
-  }
-};
 
 
 // Editar un seguimiento pendiente

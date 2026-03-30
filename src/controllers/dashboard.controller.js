@@ -107,14 +107,22 @@ const obtenerDashboard = async (req, res) => {
 
 
     const totalVentas = ventas.length;
-    const ventasGanadas = ventas.filter(v => v.estado_venta?.nombre === ESTADOS_CIERRE);
-    const ventasPerdidas = ventas.filter(v => v.estado_venta?.nombre === "Competencia");
+
+    // 1. Ganadas: Solo las que dicen "Cierre de venta"
+    const ventasGanadas = ventas.filter(v => v.estado_venta?.nombre === "Cierre de venta");
+    
+   // 2. Perdidas: Ahora incluye "Competencia" y "Prospección declinada" (a prueba de tildes y mayúsculas)
+   const ventasPerdidas = ventas.filter(v => {
+    const estado = (v.estado_venta?.nombre || "").toLowerCase().trim();
+    return estado === "competencia" || estado === "prospección declinada" || estado === "prospeccion declinada";
+  });
+
+    // 3. Cerradas Totales: Usamos el campo real de la base de datos
     const ventasCerradas = ventas.filter(v => v.abierta === 0);
 
-    // Abiertas = todas las que NO están en Cierre de venta (aún en pipeline)
-    const totalVentasAbiertas = ventas.filter(
-      v => v.estado_venta?.nombre !== ESTADOS_CIERRE
-    ).length;
+    // 4. Abiertas Reales: Usamos el campo real de la base de datos
+    const ventasAbiertasReales = ventas.filter(v => v.abierta === 1);
+    const totalVentasAbiertas = ventasAbiertasReales.length;
 
     const porcentajeGanadas = totalVentas > 0
       ? (ventasGanadas.length / totalVentas) * 100
@@ -144,8 +152,6 @@ const obtenerDashboard = async (req, res) => {
       };
     });
 
-
-
     const promedioDiasCierre = tablaCierres.length > 0
       ? Math.round(tablaCierres.reduce((sum, r) => sum + r.dias, 0) / tablaCierres.length)
       : 0;
@@ -153,7 +159,6 @@ const obtenerDashboard = async (req, res) => {
     const promedioMontoCierre = tablaCierres.length > 0
       ? Math.round(tablaCierres.reduce((sum, r) => sum + (r.monto || 0), 0) / tablaCierres.length)
       : 0;
-
 
     // Agrupar prospectos por categoría
     const resumenCategorias = {};
@@ -211,36 +216,49 @@ const obtenerDashboard = async (req, res) => {
     });
 
 
-    const tablaAbiertas = ventas
-      .filter(v => v.estado_venta?.nombre !== ESTADOS_CIERRE)
-      .map(v => {
-        const prospecto = v.prospecto;
-        const vendedora = prospecto?.vendedora_prospecto?.nombre || "No asignada";
+    // Filtrar la tabla de abiertas usando SOLO las que realmente están abiertas (abierta === 1)
+    const tablaAbiertas = ventasAbiertasReales.map(v => {
+      const prospecto = v.prospecto;
+      const vendedora = prospecto?.vendedora_prospecto?.nombre || "No asignada";
 
-        const siguienteSeguimiento = (v.seguimientos || [])
-          .filter(s => s.estado === "pendiente")
-          .sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada))[0];
+      const siguienteSeguimiento = (v.seguimientos || [])
+        .filter(s => s.estado === "pendiente")
+        .sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada))[0];
 
-        const tipoSeguimiento = siguienteSeguimiento?.tipo_seguimiento?.descripcion || "-";
-        const fechaSeguimiento = siguienteSeguimiento?.fecha_programada
-          ? new Date(siguienteSeguimiento.fecha_programada).toLocaleDateString("es-EC")
-          : "-";
+      const tipoSeguimiento = siguienteSeguimiento?.tipo_seguimiento?.descripcion || "-";
+      const fechaSeguimiento = siguienteSeguimiento?.fecha_programada
+        ? new Date(siguienteSeguimiento.fecha_programada).toLocaleDateString("es-EC")
+        : "-";
 
-        return {
-          id_venta: v.id_venta,
-          prospecto: prospecto.nombre,
-          numero_empleados: prospecto.empleados ?? "No registrado",
-          fecha_apertura: new Date(v.created_at),
-          estado: v.estado_venta?.nombre || "-",
-          motivo: siguienteSeguimiento?.motivo || "-",
-          proximo_paso: `${tipoSeguimiento} ${fechaSeguimiento}`,
-          vendedora: vendedora,
-          objetivo: v.objetivo,
-      nota: siguienteSeguimiento?.nota || "-",
-        };
-      });
+      return {
+        id_venta: v.id_venta,
+        prospecto: prospecto.nombre,
+        numero_empleados: prospecto.empleados ?? "No registrado",
+        fecha_apertura: new Date(v.created_at),
+        estado: v.estado_venta?.nombre || "-",
+        motivo: siguienteSeguimiento?.motivo || "-",
+        proximo_paso: `${tipoSeguimiento} ${fechaSeguimiento}`,
+        vendedora: vendedora,
+        objetivo: v.objetivo,
+        nota: siguienteSeguimiento?.nota || "-",
+      };
+    });
 
-
+// Crear tabla específica para las declinadas
+const tablaDeclinadas = ventas
+.filter(v => v.estado_venta?.nombre === "Prospección declinada" || v.estado_venta?.nombre === "Competencia")
+.map(v => {
+  return {
+    id_venta: v.id_venta,
+    prospecto: v.prospecto.nombre,
+    fecha_apertura: new Date(v.created_at),
+    fecha_cierre: v.fecha_cierre ? new Date(v.fecha_cierre) : null,
+    motivo_declinacion: v.motivo_declinacion || "Sin motivo registrado",
+    observacion_declinacion: v.observacion_declinacion || "Sin observación",
+    estado: v.estado_venta?.nombre,
+    vendedora: v.prospecto?.vendedora_prospecto?.nombre || "No asignada"
+  };
+});
 
     return res.json({
       totalVentas,
@@ -255,6 +273,7 @@ const obtenerDashboard = async (req, res) => {
       tablaCierres,
       tablaCompetencia,
       tablaAbiertas,
+      tablaDeclinadas,
       graficoVentas,
       graficoEstadosProspecto,
       graficoCategorias,

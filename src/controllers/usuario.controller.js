@@ -7,7 +7,7 @@ const obtenerVendedoras = async (req, res) => {
   try {
     const vendedoras = await Usuario.findAll({
       where: { rol: "vendedora" },
-      attributes: ["cedula_ruc", "nombre", "email", "estado"],
+      attributes: ["id_usuario","cedula_ruc", "nombre", "email", "estado"],
     });
 
     res.json(vendedoras);

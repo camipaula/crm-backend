@@ -12,8 +12,10 @@ const seguimientoRoutes = require("./routes/seguimiento.routes");
 const categoriasRoutes = require("./routes/categorias");
 const categoriasVentaRoutes = require("./routes/categoriasVenta.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
+const dashboardMetasRoutes = require("./routes/dashboardMetas.routes");
 const documentoRoutes = require("./routes/documento.routes");
 const logsRoutes = require("./routes/logs.routes");
+const forecastRoutes = require("./routes/forecast.routes");
 
 // Cargar variables de entorno
 dotenv.config();
@@ -38,10 +40,14 @@ app.use("/api/categorias", categoriasRoutes);
 app.use("/api/categorias-venta", categoriasVentaRoutes);
 app.use("/api/documentos", documentoRoutes);
 app.use("/api/logs", logsRoutes);
-// Agregar la ruta del dashboard
+app.use("/api/forecast", forecastRoutes);
+// Dashboard: GET /api/dashboard (principal), GET /api/dashboard/metas (KPIs metas)
 app.use("/api/dashboard", dashboardRoutes);
+// Dashboard metas (mismo controller): GET /api/dashboard-metas?anio=2026&mes=1
+app.use("/api/dashboard-metas", dashboardMetasRoutes);
 
 
+require("./models/MatchVendedora.model");
 // Importar asociaciones entre modelos antes de sincronizar
 require("./models/associations");
 

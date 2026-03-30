@@ -492,8 +492,8 @@ const reabrirVenta = async (req, res) => {
       return res.status(400).json({ message: "La venta ya está abierta" });
     }
 
-    if (!venta.estado_venta || venta.estado_venta.nombre !== "Competencia") {
-      return res.status(400).json({ message: "Solo se pueden reabrir ventas en estado 'Competencia'" });
+    if (!venta.estado_venta || (venta.estado_venta.nombre !== "Competencia" && venta.estado_venta.nombre !== "Prospección declinada")) {
+      return res.status(400).json({ message: "Solo se pueden reabrir ventas en estado 'Competencia' o 'Prospección declinada'" });
     }
 
     const estadoInicial = await EstadoProspecto.findOne({ where: { nombre: ESTADO_INICIAL_VENTA } });
@@ -504,6 +504,8 @@ const reabrirVenta = async (req, res) => {
     venta.abierta = 1;
     venta.fecha_cierre = null;
     venta.id_estado = estadoInicial.id_estado;
+    venta.motivo_declinacion = null;
+    venta.observacion_declinacion = null;
     await venta.save();
 
     await SeguimientoVenta.create({
@@ -529,6 +531,7 @@ const reabrirVenta = async (req, res) => {
     res.status(500).json({ message: "Error al reabrir venta", error });
   }
 };
+
 
 
 module.exports = {

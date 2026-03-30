@@ -2,6 +2,12 @@ const { DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
 const Usuario = sequelize.define("Usuario", {
+    id_usuario: {
+        type: DataTypes.INTEGER,
+        autoIncrement: true,
+        unique: true,
+        allowNull: false,
+    },
     cedula_ruc: {
         type: DataTypes.STRING(20),
         primaryKey: true,

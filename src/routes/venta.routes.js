@@ -1,4 +1,6 @@
 const express = require("express");
+
+// 1. Importaciones del CRM interno
 const {
   obtenerVentas,
   obtenerVentasPorProspecto,
@@ -9,40 +11,38 @@ const {
   editarObjetivoVenta,
   obtenerProspeccionesAgrupadas,
   actualizarMontoCierre,
-  reabrirVenta
-} = require("../controllers/ventaProspecto.controller")
+  reabrirVenta,
+} = require("../controllers/ventaProspecto.controller");
+
+// 2. Importaciones de la API externa y Matches
+const { 
+  sincronizarVentasReales,
+  hacerMatchVendedora,
+  obtenerCodigosExternos,
+  obtenerMatchesVendedoras
+} = require("../controllers/ventaRealMensual.controller");
 
 const verificarToken = require("../middlewares/authMiddleware");
 const soloLectura = require("../middlewares/soloLectura");
 
 const router = express.Router();
 
+// --- RUTAS DE MATCH Y EXTERNAS ---
+router.get("/codigos-externos", verificarToken, soloLectura, obtenerCodigosExternos);
+router.get("/matches-vendedoras", verificarToken, soloLectura, obtenerMatchesVendedoras);
+router.post("/sincronizar", verificarToken, soloLectura, sincronizarVentasReales);
+router.post("/match-vendedora", verificarToken, soloLectura, hacerMatchVendedora);
 
-// Obtener todas las ventas de un prospecto específico
+// --- RUTAS DEL CRM INTERNO ---
 router.get("/prospecto/:id_prospecto", verificarToken, obtenerVentasPorProspecto);
-
-//obtener ventas agrupadas
-router.get("/prospecciones", obtenerProspeccionesAgrupadas);
-
-// Obtener todas las ventas
+router.get("/prospecciones", verificarToken, obtenerProspeccionesAgrupadas); // Agregué verificarToken por seguridad
 router.get("/", verificarToken, obtenerVentas);
-
-// Obtener una venta por ID
 router.get("/:id_venta", verificarToken, obtenerVentaPorId);
-
-// Crear una nueva venta para un prospecto
-router.post("/", verificarToken,soloLectura, crearVenta);
-
-// Cerrar una venta (cambiar estado a cerrada)
-router.put("/:id_venta/cerrar", verificarToken,soloLectura, cerrarVenta);
-
-// Eliminar una venta
-router.delete("/:id_venta", verificarToken, soloLectura,eliminarVenta);
-
+router.post("/", verificarToken, soloLectura, crearVenta);
+router.put("/:id_venta/cerrar", verificarToken, soloLectura, cerrarVenta);
+router.delete("/:id_venta", verificarToken, soloLectura, eliminarVenta);
 router.put("/:id_venta/reabrir", verificarToken, soloLectura, reabrirVenta);
-
-router.put("/:id_venta/objetivo", verificarToken,soloLectura, editarObjetivoVenta);
-
-router.put("/actualizar-monto", verificarToken,soloLectura, actualizarMontoCierre);
+router.put("/:id_venta/objetivo", verificarToken, soloLectura, editarObjetivoVenta);
+router.put("/actualizar-monto", verificarToken, soloLectura, actualizarMontoCierre);
 
 module.exports = router;
