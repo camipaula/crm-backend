@@ -285,12 +285,12 @@ const crearProspecto = async (req, res) => {
 
 
 
-    // Obtener estado inicial "Captación/ensayo"
-    const estadoInicial = await EstadoProspecto.findOne({ where: { nombre: "Captación/ensayo" } });
+    // Obtener estado inicial "Captación"
+    const estadoInicial = await EstadoProspecto.findOne({ where: { nombre: "Captación" } });
     if (!estadoInicial) {
-      return res.status(500).json({ message: "Estado 'Captación/ensayo' no está registrado en la base de datos." });
+      return res.status(500).json({ message: "Estado 'Captación' no está registrado en la base de datos." });
     }
-
+    
     // Crear prospecto
     const nuevoProspecto = await Prospecto.create({
       cedula_ruc,
