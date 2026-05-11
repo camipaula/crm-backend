@@ -10,7 +10,6 @@ const TipoSeguimiento = require("../models/TipoSeguimiento.model");
 
 const ESTADOS_CIERRE = "Cierre de venta";
 
-// ACTUALIZADO CON TUS NUEVOS NOMBRES DE LA BASE DE DATOS
 const ORDEN_ESTADOS = [
   "Captación",
   "Citas",
@@ -34,6 +33,7 @@ const obtenerDashboard = async (req, res) => {
 
     const filtrosVenta = { eliminado: 0 };
     const filtrosProspecto = { eliminado: 0 };
+    const condicionesTexto = []; // Array para unificar mayúsculas/minúsculas
 
     if (fecha_inicio && fecha_fin) {
       const fechaInicioDate = new Date(fecha_inicio);
@@ -47,8 +47,28 @@ const obtenerDashboard = async (req, res) => {
     if (cedula_vendedora) filtrosProspecto.cedula_vendedora = cedula_vendedora;
     if (id_categoria) filtrosProspecto.id_categoria = id_categoria;
     if (id_origen) filtrosProspecto.id_origen = id_origen;
-    if (sector) filtrosProspecto.sector = sector;
-    if (ciudad) filtrosProspecto.ciudad = ciudad;
+
+    // 👇 AQUÍ UNIFICAMOS MAYÚSCULAS Y MINÚSCULAS PARA LOS FILTROS DE TEXTO 👇
+    if (sector) {
+      condicionesTexto.push(
+        Sequelize.where(
+          Sequelize.fn('LOWER', Sequelize.col('prospecto.sector')),
+          sector.toLowerCase().trim()
+        )
+      );
+    }
+    if (ciudad) {
+      condicionesTexto.push(
+        Sequelize.where(
+          Sequelize.fn('LOWER', Sequelize.col('prospecto.ciudad')),
+          ciudad.toLowerCase().trim()
+        )
+      );
+    }
+
+    if (condicionesTexto.length > 0) {
+      filtrosProspecto[Op.and] = condicionesTexto;
+    }
 
     const [vendedoras, categorias, origenes] = await Promise.all([
       Usuario.findAll({
@@ -188,17 +208,15 @@ const obtenerDashboard = async (req, res) => {
     }).sort((a, b) => b.montoGenerado - a.montoGenerado); 
 
     // =========================================================
-    // 2. NUEVA CONSULTA: Gráfica YoY (IGNORA EL FILTRO DE FECHAS)
+    // 2. NUEVA CONSULTA: Gráfica YoY
     // =========================================================
-    // Traemos TODAS las ventas (sin importar fecha_inicio/fecha_fin) pero respetando
-    // si el admin filtró por vendedora, ciudad, etc.
     const ventasAnuales = await VentaProspecto.findAll({
       where: { eliminado: 0 }, 
       include: [
         {
           model: Prospecto,
           as: "prospecto",
-          where: filtrosProspecto, // Respeta vendedora, sector, ciudad
+          where: filtrosProspecto,
           required: true
         },
         {
@@ -233,7 +251,6 @@ const obtenerDashboard = async (req, res) => {
     });
 
     const comparativaAnual = Object.values(datosYoY);
-    // =========================================================
 
     const resumenCategorias = {};
     ventas.forEach(v => {
