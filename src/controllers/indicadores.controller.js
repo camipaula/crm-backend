@@ -1,6 +1,6 @@
+// Después (corregido con mayúsculas exactas)
 const Prospecto = require("../models/Prospecto.model");
-
-const VentaProspecto = require("../models/ventaProspecto.model"); 
+const VentaProspecto = require("../models/VentaProspecto.model");
 const { Op } = require("sequelize");
 
 const obtenerIndicadores = async (req, res) => {
