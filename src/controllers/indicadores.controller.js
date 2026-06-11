@@ -1,4 +1,5 @@
-const Prospecto = require("../models/prospecto.model"); 
+const Prospecto = require("../models/Prospecto.model");
+
 const VentaProspecto = require("../models/ventaProspecto.model"); 
 const { Op } = require("sequelize");
 
