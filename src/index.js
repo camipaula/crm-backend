@@ -16,12 +16,13 @@ const dashboardMetasRoutes = require("./routes/dashboardMetas.routes");
 const documentoRoutes = require("./routes/documento.routes");
 const logsRoutes = require("./routes/logs.routes");
 const forecastRoutes = require("./routes/forecast.routes");
+const indicadoresRoutes = require("./routes/indicadores.routes"); // 👇 Importamos la ruta aquí arriba con las demás
 
 // Cargar variables de entorno
 dotenv.config();
 
 // Crear la aplicación Express
-const app = express();
+const app = express(); // 👉 AQUÍ NACE "app"
 
 // Middleware
 app.use(cors());
@@ -30,7 +31,7 @@ app.use(express.json());
 // Archivos subidos (para descargar documentos)
 app.use("/api/uploads", express.static("uploads"));
 
-// Definir rutas
+// Definir rutas (Todo esto va DESPUÉS de const app = express())
 app.use("/api/auth", authRoutes);
 app.use("/api/prospectos", prospectoRoutes);
 app.use("/api/usuarios", usuarioRoutes);
@@ -41,10 +42,14 @@ app.use("/api/categorias-venta", categoriasVentaRoutes);
 app.use("/api/documentos", documentoRoutes);
 app.use("/api/logs", logsRoutes);
 app.use("/api/forecast", forecastRoutes);
+
 // Dashboard: GET /api/dashboard (principal), GET /api/dashboard/metas (KPIs metas)
 app.use("/api/dashboard", dashboardRoutes);
 // Dashboard metas (mismo controller): GET /api/dashboard-metas?anio=2026&mes=1
 app.use("/api/dashboard-metas", dashboardMetasRoutes);
+
+// 👇 Y usamos la ruta de indicadores aquí, junto a sus hermanas
+app.use("/api/indicadores", indicadoresRoutes);
 
 
 require("./models/MatchVendedora.model");
