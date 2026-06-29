@@ -20,6 +20,10 @@ const LogAcceso = sequelize.define(
       type: DataTypes.DATE,
       allowNull: false,
     },
+    fecha_salida: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     ip: {
       type: DataTypes.STRING(45),
       allowNull: true,

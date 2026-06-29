@@ -21,16 +21,15 @@ router.get("/vendedoras", obtenerVendedoras);
 router.get("/vendedoras/:cedula_ruc", obtenerVendedoraPorCedula);
 
 // Ruta para Editar Vendedora
-router.put("/vendedoras/:cedula_ruc", verificarToken,soloLectura, actualizarVendedora);
+router.put("/vendedoras/:cedula_ruc", verificarToken, soloLectura, actualizarVendedora);
 
-// Ruta para inactivar vendedora (opcional si prefieres separarla)
-router.patch("/vendedoras/:cedula_ruc/inactivar",verificarToken, soloLectura, cambiarEstadoVendedora);
+// Ruta para inactivar vendedora
+router.patch("/vendedoras/:cedula_ruc/inactivar", verificarToken, soloLectura, cambiarEstadoVendedora);
 
 // Ruta para eliminar Vendedora
-router.delete("/vendedoras/:cedula_ruc",verificarToken,soloLectura, eliminarVendedora);
+router.delete("/vendedoras/:cedula_ruc", verificarToken, soloLectura, eliminarVendedora);
 
-router.get("/mi-perfil", verificarToken,soloLectura, obtenerPerfilAdmin);
-router.put("/mi-perfil", verificarToken,soloLectura, actualizarPerfilAdmin);
-
+router.get("/mi-perfil", verificarToken, soloLectura, obtenerPerfilAdmin);
+router.put("/mi-perfil", verificarToken, soloLectura, actualizarPerfilAdmin);
 
 module.exports = router;

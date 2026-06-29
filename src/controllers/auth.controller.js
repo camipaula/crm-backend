@@ -1,13 +1,13 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Usuario = require("../models/Usuario.model");
+const LogAcceso = require("../models/LogAcceso.model");
 const { registrarLogAcceso } = require("../utils/audit");
-
 
 function validarCedulaEcuatoriana(cedula) {
   if (!cedula || cedula.length !== 10) return false;
 
-  const digitos = cedula.split("").map(Number); //convierte la cédula de string a array
+  const digitos = cedula.split("").map(Number);
   const provincia = parseInt(cedula.substring(0, 2));
 
   if (provincia < 1 || provincia > 24) return false;
@@ -36,23 +36,19 @@ function validarEmail(email) {
   return regex.test(email);
 }
 
-
 const signup = async (req, res) => {
   try {
     const { cedula_ruc, nombre, email, password, rol } = req.body;
 
-    // Validar campos obligatorios
     if (!cedula_ruc || !nombre || !email || !password || !rol) {
       return res.status(400).json({ message: "Todos los campos son obligatorios" });
     }
 
-    // Validación de cédula ecuatoriana solo si tiene 10 dígitos
     if (cedula_ruc.length === 10) {
       if (!validarCedulaEcuatoriana(cedula_ruc)) {
         return res.status(400).json({ message: "La cédula ingresada no es válida" });
       }
     } else {
-      // Validación básica para otros tipos de documento
       if (cedula_ruc.length < 6) {
         return res.status(400).json({ message: "Verificar el documento ingresado" });
       }
@@ -62,34 +58,29 @@ const signup = async (req, res) => {
       return res.status(400).json({ message: "El correo electrónico no es válido" });
     }
     
-    // Opcional: validar longitud mínima de la contraseña
     if (password.length < 6) {
       return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
     }
 
-    // Verifica si el usuario ya existe por email
     const usuarioExistente = await Usuario.findOne({ where: { email } });
     if (usuarioExistente) {
       return res.status(400).json({ message: "El usuario ya está registrado" });
     }
 
-    // Verifica si la cédula ya está registrada
     const cedulaExistente = await Usuario.findOne({ where: { cedula_ruc } });
     if (cedulaExistente) {
       return res.status(400).json({ message: "La cédula ya está registrada" });
     }
 
-    // Hashea la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crea el nuevo usuario
     const nuevoUsuario = await Usuario.create({
       cedula_ruc,
       nombre,
       email,
       password: hashedPassword,
       rol,
-      estado: 1, // opcional, para activar usuario por defecto
+      estado: 1,
     });
 
     res.status(201).json({ message: "Usuario creado exitosamente", usuario: nuevoUsuario });
@@ -113,19 +104,24 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Contraseña incorrecta" });
     }
 
-   if (usuario.estado === 0) {
-  return res.status(403).json({ message: "Usuario inactivo. Contacte al administrador." });
-}
-
+    if (usuario.estado === 0) {
+      return res.status(403).json({ message: "Usuario inactivo. Contacte al administrador." });
+    }
     
-    // Genera el token con la cédula y el rol dentro del payload
     const token = jwt.sign(
       { cedula_ruc: usuario.cedula_ruc, email: usuario.email, rol: usuario.rol, nombre: usuario.nombre },
       process.env.JWT_SECRET,
       { expiresIn: "12h" }
     );
 
+    // Registra el log histórico de accesos
     await registrarLogAcceso(usuario.cedula_ruc, req);
+
+    // Actualiza la última conexión de inmediato para activar el indicador visual
+    await Usuario.update(
+      { ultima_conexion: new Date() },
+      { where: { cedula_ruc: usuario.cedula_ruc } }
+    );
 
     res.status(200).json({
       message: "Login exitoso",
@@ -138,6 +134,49 @@ const login = async (req, res) => {
   }
 };
 
+const registrarPing = async (req, res) => {
+  try {
+    const { cedula_ruc } = req.usuario; 
+    
+    await Usuario.update(
+      { ultima_conexion: new Date() },
+      { where: { cedula_ruc } }
+    );
 
+    res.status(200).json({ message: "Latido recibido" });
+  } catch (error) {
+    console.error("Error en ping:", error);
+    res.status(500).json({ message: "Error al registrar latido" });
+  }
+};
 
-module.exports = { signup, login };
+// Nueva función para limpiar la conexión al cerrar sesión
+const logoutSystem = async (req, res) => {
+  try {
+    const { cedula_ruc } = req.usuario;
+
+    // 1. Apagamos el foquito verde
+    await Usuario.update(
+      { ultima_conexion: null },
+      { where: { cedula_ruc } }
+    );
+
+    // 2. 👇 NUEVO: Buscamos su último ingreso y anotamos la salida
+    const ultimoAcceso = await LogAcceso.findOne({
+      where: { cedula_usuario: cedula_ruc },
+      order: [['fecha_ingreso', 'DESC']]
+    });
+
+    if (ultimoAcceso && !ultimoAcceso.fecha_salida) {
+      ultimoAcceso.fecha_salida = new Date();
+      await ultimoAcceso.save();
+    }
+
+    res.status(200).json({ message: "Sesión cerrada correctamente" });
+  } catch (error) {
+    console.error("Error en logoutSystem:", error);
+    res.status(500).json({ message: "Error al cerrar sesión", error });
+  }
+};
+
+module.exports = { signup, login, registrarPing, logoutSystem };

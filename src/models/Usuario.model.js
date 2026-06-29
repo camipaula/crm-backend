@@ -38,6 +38,10 @@ const Usuario = sequelize.define("Usuario", {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
+    },
+    ultima_conexion: {
+        type: DataTypes.DATE,
+        allowNull: true,
     }
 }, {
     tableName: "usuario",
